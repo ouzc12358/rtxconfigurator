@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import type { ProductModel, Selections } from '../types';
+import type { ProductModel, Selections, Option } from '../types';
 import * as images from '../images';
 
 interface ProductImageProps {
@@ -76,8 +75,24 @@ const getImageSources = (model: ProductModel, selections: Selections): ImageInfo
 
     // 2. Pressure Connection Image (only for A and G models)
     if ((modelId === 'RTX2300A' || modelId === 'RTX2400G') && processConnection) {
-        const highPressureRanges = ['G7', 'G8', 'G9'];
-        const isHighPressure = pressureRange && highPressureRanges.includes(pressureRange);
+        
+        let isHighPressure = false;
+        if (pressureRange) {
+            const pressureCategory = model.configuration.find(c => c.id === 'pressureRange');
+            const selectedOption = pressureCategory?.options.find(o => o.code === pressureRange);
+            if (selectedOption?.max && selectedOption?.unit) {
+                const maxPressure = selectedOption.max;
+                const unit = selectedOption.unit;
+                let maxInMpa = maxPressure;
+                if (unit === 'kPa') {
+                    maxInMpa = maxPressure / 1000;
+                }
+                // Check if max pressure is greater than 5 MPa
+                if (maxInMpa > 5) {
+                    isHighPressure = true;
+                }
+            }
+        }
 
         let connSrc = '';
         if (isHighPressure) {

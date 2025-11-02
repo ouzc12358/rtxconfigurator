@@ -1,6 +1,5 @@
-
 // Base transmitter bodies. Sourced from PDF diagrams 3.4.1 and 3.4.4.
-export const base_rtx2300_2400g = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/base-rtx2300_2400g.png';
+export const base_rtx2300_2400g = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/rtx2300_basic_dimensions.png';
 export const base_rtx2400k_2500d = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/base-rtx2400k_2500d.png';
 
 // Pressure connections for RTX2300/2400G (<= 5MPa). Sourced from PDF diagram 3.4.2.
