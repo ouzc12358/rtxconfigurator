@@ -1,20 +1,16 @@
+
 import React, { useState, useEffect } from 'react';
-import type { ProductModel, Selections, Option } from '../types';
+import type { ProductModel, Selections, ImageInfo } from '../types';
 import * as images from '../images';
 
 interface ProductImageProps {
     model: ProductModel;
     selections: Selections;
-}
-
-interface ImageInfo {
-    src: string;
-    alt: string;
-    title: string;
+    onImageClick: (image: ImageInfo) => void;
 }
 
 // Sub-component to render a single image with its own loading and error states
-const SingleImage: React.FC<{ src: string, alt: string }> = ({ src, alt }) => {
+const SingleImage: React.FC<{ src: string, alt: string, onClick: () => void }> = ({ src, alt, onClick }) => {
     const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
 
     useEffect(() => {
@@ -26,7 +22,10 @@ const SingleImage: React.FC<{ src: string, alt: string }> = ({ src, alt }) => {
     }, [src]);
 
     return (
-        <div className="relative w-full aspect-square bg-gray-100 rounded-md overflow-hidden">
+        <div 
+            className="relative w-full aspect-square bg-gray-100 rounded-md overflow-hidden cursor-zoom-in group"
+            onClick={onClick}
+        >
             {status === 'loading' && (
                 <div className="absolute inset-0 flex items-center justify-center" aria-label="Loading image">
                     <svg className="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -46,7 +45,7 @@ const SingleImage: React.FC<{ src: string, alt: string }> = ({ src, alt }) => {
             <img
                 src={src}
                 alt={alt}
-                className={`absolute inset-0 object-contain w-full h-full transition-opacity duration-300 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
+                className={`absolute inset-0 object-contain w-full h-full transition-all duration-300 group-hover:scale-105 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
                 aria-hidden={status !== 'loaded'}
             />
         </div>
@@ -140,7 +139,7 @@ const getImageSources = (model: ProductModel, selections: Selections): ImageInfo
 };
 
 
-export const ProductImage: React.FC<ProductImageProps> = ({ model, selections }) => {
+export const ProductImage: React.FC<ProductImageProps> = ({ model, selections, onImageClick }) => {
     const imageSources = getImageSources(model, selections);
 
     if (imageSources.length === 0) {
@@ -156,7 +155,11 @@ export const ProductImage: React.FC<ProductImageProps> = ({ model, selections })
             {imageSources.map((img, index) => (
                 <div key={`${img.src}-${index}`}>
                     <h3 className="text-sm font-semibold text-gray-700 mb-2 text-center">{img.title}</h3>
-                    <SingleImage src={img.src} alt={img.alt} />
+                    <SingleImage 
+                        src={img.src} 
+                        alt={img.alt}
+                        onClick={() => onImageClick(img)}
+                    />
                 </div>
             ))}
         </div>

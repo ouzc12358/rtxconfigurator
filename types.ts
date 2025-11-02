@@ -32,3 +32,9 @@ export interface ProductModel {
 export type Selections = {
     [categoryId: string]: string | undefined;
 };
+
+export interface ImageInfo {
+    src: string;
+    alt: string;
+    title: string;
+}

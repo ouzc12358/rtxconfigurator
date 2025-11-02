@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import type { ProductModel, Selections, Option } from '../types';
 
@@ -9,6 +8,8 @@ interface SummaryProps {
     onTagChange: (tag: string) => void;
     customRange: { low: string; high: string };
     onCustomRangeChange: (range: { low: string; high: string }) => void;
+    specialRequest: string;
+    onSpecialRequestChange: (request: string) => void;
 }
 
 const generateTransmitterModelNumber = (
@@ -16,7 +17,8 @@ const generateTransmitterModelNumber = (
     selections: Selections,
     customRange: { low: string; high: string },
     selectedRangeOption: Option | undefined,
-    isCustomRangeSet: boolean
+    isCustomRangeSet: boolean,
+    specialRequest: string
 ): [string, string, string, string] => {
     const requiredSelections = model.configuration
         .filter(c => c.part === 'required')
@@ -40,7 +42,7 @@ const generateTransmitterModelNumber = (
         }
     }
     
-    const line4 = "Special requests..."; 
+    const line4 = specialRequest; 
 
     return [line1, line2, line3, line4];
 };
@@ -71,7 +73,7 @@ const generateManifoldModelNumber = (model: ProductModel, selections: Selections
 };
 
 
-export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagChange, customRange, onCustomRangeChange }) => {
+export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagChange, customRange, onCustomRangeChange, specialRequest, onSpecialRequestChange }) => {
     const [isCopied, setIsCopied] = useState(false);
     
     const { 
@@ -113,7 +115,7 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
             isCustomRangeValidAndSet = true;
         }
 
-        const transmitterLines = generateTransmitterModelNumber(model, selections, customRange, selectedRangeOption, isCustomRangeValidAndSet);
+        const transmitterLines = generateTransmitterModelNumber(model, selections, customRange, selectedRangeOption, isCustomRangeValidAndSet, specialRequest);
         const manifoldNumber = generateManifoldModelNumber(model, selections);
         
         const selectedOptionsList = model.configuration
@@ -138,7 +140,9 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
         configDetails.push(`Line 2: ${transmitterLines[1]}`);
         const line3Label = isCustomRangeValidAndSet ? 'Calibrated Range' : 'Selected Range';
         configDetails.push(`Line 3 (${line3Label}): ${transmitterLines[2]}`);
-        configDetails.push(`Line 4 (Example Request): ${transmitterLines[3]}`);
+        if (transmitterLines[3]) {
+            configDetails.push(`Line 4 (Special Requests): ${transmitterLines[3]}`);
+        }
 
         if (manifoldNumber) {
             configDetails.push("\n--- Valve Manifold Model Number ---");
@@ -165,7 +169,7 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
             selectedOptionsList
         };
 
-    }, [model, selections, tag, customRange]);
+    }, [model, selections, tag, customRange, specialRequest]);
 
     const handleCopyToClipboard = () => {
         navigator.clipboard.writeText(fullConfigText).then(() => {
@@ -183,7 +187,7 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
                     line1: transmitterModelLines[0],
                     line2: transmitterModelLines[1],
                     line3: `(${isCustomRangeValidAndSet ? 'Calibrated' : 'Selected'} Range): ${transmitterModelLines[2]}`,
-                    line4: `(Example Request): ${transmitterModelLines[3]}`,
+                    line4: `(Special Requests): ${transmitterModelLines[3]}`,
                 },
                 manifold: manifoldModelNumber || 'N/A',
             },
@@ -192,6 +196,7 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
                 high: customRange.high,
                 unit: selectedRangeOption?.unit || '',
             } : 'N/A',
+            specialRequest: specialRequest || 'N/A',
             selectedOptions: selectedOptionsList,
         };
 
@@ -208,6 +213,125 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
     };
+
+    const handleExportToPdf = () => {
+        // @ts-ignore - jspdf is loaded from CDN
+        const { jsPDF } = window.jspdf;
+        if (!jsPDF) {
+            alert('PDF generation library is not loaded. Please try again.');
+            return;
+        }
+
+        const doc = new jsPDF();
+        const logoUrl = 'https://www.bakerhughes.com/sites/bakerhughes/files/2021-10/druck_no_tagline_web.jpg';
+
+        const addContent = (imgData?: string) => {
+            if (imgData) {
+                doc.addImage(imgData, 'JPEG', 15, 10, 50, 8); // x, y, w, h
+            }
+
+            doc.setFontSize(18);
+            doc.setFont(undefined, 'bold');
+            doc.text('Druck RTX2000 Series Configuration', 105, 20, { align: 'center' });
+
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Date: ${new Date().toLocaleDateString()}`, 195, 28, { align: 'right' });
+
+            let y = 40;
+            const lineSpacing = 6;
+            const sectionSpacing = 10;
+            const pageMargin = 15;
+            const contentWidth = doc.internal.pageSize.getWidth() - (pageMargin * 2);
+            const keyX = pageMargin;
+            const valueX = 75;
+
+            const checkPageBreak = () => {
+                if (y > 280) {
+                    doc.addPage();
+                    y = 20;
+                }
+            };
+            
+            const addSectionHeader = (text: string) => {
+                checkPageBreak();
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text(text, keyX, y);
+                y += lineSpacing + 2;
+            };
+
+            const addKeyValue = (key: string, value: string) => {
+                checkPageBreak();
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'bold');
+                doc.text(key, keyX, y);
+                doc.setFont(undefined, 'normal');
+                const splitValue = doc.splitTextToSize(value, contentWidth - (valueX - keyX));
+                doc.text(splitValue, valueX, y);
+                y += splitValue.length * 5; // Adjust y based on number of lines
+                y += 2; // Extra padding
+            };
+            
+            addSectionHeader('Configuration Summary');
+            addKeyValue('Product Model:', model.name);
+            if (tag) addKeyValue('Tag Number:', tag);
+            y += sectionSpacing / 2;
+            
+            addSectionHeader('Transmitter Model Number');
+            addKeyValue('Line 1:', transmitterModelLines[0]);
+            addKeyValue('Line 2:', transmitterModelLines[1]);
+            addKeyValue(`Line 3 (${isCustomRangeValidAndSet ? 'Calibrated' : 'Selected'} Range):`, transmitterModelLines[2]);
+            if (specialRequest) addKeyValue('Line 4 (Special Requests):', specialRequest);
+            y += sectionSpacing / 2;
+
+            if (manifoldModelNumber) {
+                addSectionHeader('Valve Manifold Model Number');
+                addKeyValue('Full Code:', manifoldModelNumber);
+                y += sectionSpacing / 2;
+            }
+            
+            addSectionHeader('Configuration Details');
+            selectedOptionsList.forEach(item => {
+                addKeyValue(`${item.category}:`, `${item.description} (${item.code})`);
+            });
+
+            if (isCustomRangeValidAndSet) {
+                 addKeyValue('Custom Range:', `${customRange.low} to ${customRange.high} ${selectedRangeOption?.unit}`);
+            }
+
+            const date = new Date().toISOString().split('T')[0];
+            doc.save(`${model.name.replace(/\s/g, '_')}_Configuration_${date}.pdf`);
+        };
+
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            // FIX: Replaced `this` with the `img` variable from the closure. TypeScript incorrectly
+            // types `this` as `GlobalEventHandlers` within an `onload` handler, causing type errors.
+            // Using the explicitly declared `img` (HTMLImageElement) resolves this.
+            const scaleX = img.naturalWidth / img.naturalWidth;
+            const scaleY = img.naturalHeight / img.naturalHeight;
+            const scale = Math.min(scaleX, scaleY);
+            canvas.width = img.naturalWidth / scale;
+            canvas.height = img.naturalHeight / scale;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const dataURL = canvas.toDataURL('image/jpeg');
+                addContent(dataURL);
+            } else {
+                 addContent();
+            }
+        };
+        img.onerror = function() {
+            console.error("Could not load logo for PDF. Proceeding without it.");
+            addContent(); // Proceed without the logo
+        };
+        img.src = logoUrl;
+    };
+
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-lg">
@@ -254,6 +378,20 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
                     {rangeError && <p id="range-error" className="text-xs text-red-600 mt-1">{rangeError}</p>}
                 </div>
             )}
+            
+            <div className="mb-4">
+                <label htmlFor="special-request-input" className="block text-sm font-medium text-gray-700 mb-1">
+                    Line 4: Special Requests (Optional)
+                </label>
+                <textarea
+                    id="special-request-input"
+                    rows={2}
+                    value={specialRequest}
+                    onChange={(e) => onSpecialRequestChange(e.target.value)}
+                    placeholder="e.g., Special calibration points, documentation..."
+                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                />
+            </div>
 
             <div className="bg-gray-100 p-4 rounded-md mb-4 font-mono text-sm text-gray-800 space-y-1">
                  <p className="font-semibold text-gray-600">Transmitter Model:</p>
@@ -262,7 +400,7 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
                 <p className="text-xs text-gray-500">
                     Line 3 ({isCustomRangeValidAndSet ? 'Calibrated' : 'Selected'} Range): {transmitterModelLines[2]}
                 </p>
-                <p className="text-xs text-gray-500">Line 4: {transmitterModelLines[3]}</p>
+                {transmitterModelLines[3] && <p className="text-xs text-gray-500">Line 4: {transmitterModelLines[3]}</p>}
             </div>
             
             {manifoldModelNumber && (
@@ -303,7 +441,20 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Export to File
+                    Export JSON
+                </button>
+            </div>
+             <div className="mt-3">
+                 <button
+                    onClick={handleExportToPdf}
+                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                    aria-label="Export configuration to a PDF file"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4 0a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V2a2 2 0 00-2-2H4zm0 1h12a1 1 0 011 1v16a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1z"/>
+                        <path d="M6 8v9h2V8H6zm4 0v9h2V8h-2zm4 0v9h2V8h-2zM6 4h8v2H6V4z"/>
+                    </svg>
+                    Export to PDF
                 </button>
             </div>
         </div>

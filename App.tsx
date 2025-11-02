@@ -1,10 +1,9 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Configurator } from './components/Configurator';
 import { Summary } from './components/Summary';
 import { ProductImage } from './components/ProductImage';
 import { productModels } from './data/productData';
-import type { Selections, ProductModel } from './types';
+import type { Selections, ProductModel, ImageInfo } from './types';
 
 // Key for localStorage
 const LOCAL_STORAGE_KEY = 'druckRtxConfiguratorState';
@@ -18,7 +17,7 @@ const loadState = () => {
         }
         const parsed = JSON.parse(serializedState);
         // Basic validation to ensure the loaded object has expected keys
-        if ('selectedModelId' in parsed && 'selections' in parsed && 'tag' in parsed && 'customRange' in parsed) {
+        if ('selectedModelId' in parsed && 'selections' in parsed && 'tag' in parsed && 'customRange' in parsed && 'specialRequest' in parsed) {
             return parsed;
         }
         return undefined;
@@ -28,6 +27,69 @@ const loadState = () => {
     }
 };
 
+// --- Image Zoom Modal Component ---
+interface ImageZoomModalProps {
+    image: ImageInfo;
+    onClose: () => void;
+}
+
+const ImageZoomModal: React.FC<ImageZoomModalProps> = ({ image, onClose }) => {
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        // Prevent background scrolling when modal is open
+        document.body.style.overflow = 'hidden';
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.body.style.overflow = '';
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [onClose]);
+
+    return (
+        <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm transition-opacity"
+            onClick={onClose}
+            aria-modal="true"
+            role="dialog"
+        >
+            <div 
+                className="relative bg-white p-4 rounded-lg shadow-2xl max-w-4xl w-[90%] max-h-[90vh] transition-transform transform scale-95 animate-zoom-in"
+                onClick={(e) => e.stopPropagation()} // Prevent closing when clicking on the image container
+            >
+                 <style>{`
+                    @keyframes zoom-in {
+                        from { transform: scale(0.9); opacity: 0; }
+                        to { transform: scale(1); opacity: 1; }
+                    }
+                    .animate-zoom-in {
+                        animation: zoom-in 0.2s ease-out forwards;
+                    }
+                `}</style>
+                <button 
+                    onClick={onClose}
+                    className="absolute top-2 right-2 z-10 bg-gray-100 rounded-full p-1 text-gray-600 hover:bg-gray-300 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                    aria-label="Close image view"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <div className="flex flex-col h-full">
+                    <div className="flex-grow flex items-center justify-center overflow-hidden">
+                        <img src={image.src} alt={image.alt} className="max-w-full max-h-full object-contain" />
+                    </div>
+                    <p className="flex-shrink-0 text-center text-sm text-gray-600 pt-3 font-semibold">{image.title}</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 const App: React.FC = () => {
     const [initialState] = useState(loadState);
 
@@ -35,9 +97,13 @@ const App: React.FC = () => {
     const [selections, setSelections] = useState<Selections>(initialState?.selections || {});
     const [tag, setTag] = useState<string>(initialState?.tag || '');
     const [customRange, setCustomRange] = useState<{ low: string; high: string }>(initialState?.customRange || { low: '', high: '' });
+    const [specialRequest, setSpecialRequest] = useState<string>(initialState?.specialRequest || '');
     
     // State for the single quick configuration input field
     const [fullModelCode, setFullModelCode] = useState('');
+    
+    // State for the image zoom modal
+    const [zoomedImage, setZoomedImage] = useState<ImageInfo | null>(null);
 
     const selectedModel = useMemo(() => {
         if (!selectedModelId) return null;
@@ -51,6 +117,7 @@ const App: React.FC = () => {
             selections,
             tag,
             customRange,
+            specialRequest,
         };
         try {
             const serializedState = JSON.stringify(stateToSave);
@@ -58,7 +125,7 @@ const App: React.FC = () => {
         } catch (err) {
             console.error("Could not save state to localStorage", err);
         }
-    }, [selectedModelId, selections, tag, customRange]);
+    }, [selectedModelId, selections, tag, customRange, specialRequest]);
     
     // Effect to validate the loaded model ID and reset if it's no longer valid
     useEffect(() => {
@@ -78,6 +145,7 @@ const App: React.FC = () => {
         setSelections({});
         setCustomRange({ low: '', high: '' });
         setTag('');
+        setSpecialRequest('');
         setFullModelCode('');
     };
 
@@ -106,6 +174,7 @@ const App: React.FC = () => {
         setSelectedModelId(matchedModel.id);
         setCustomRange({ low: '', high: '' });
         setTag('');
+        setSpecialRequest('');
 
         let codeForOptions = code.substring(matchedModel.baseCode.length).replace(/^-+|-+$/g, '');
         const newSelections: Selections = {};
@@ -160,6 +229,7 @@ const App: React.FC = () => {
         setSelections({});
         setTag('');
         setCustomRange({ low: '', high: '' });
+        setSpecialRequest('');
         setFullModelCode('');
     };
 
@@ -247,7 +317,11 @@ const App: React.FC = () => {
                             <div className="lg:grid lg:grid-cols-5 lg:gap-8">
                                 <div className="lg:col-span-2 mb-8 lg:mb-0">
                                     <div className="bg-white p-4 rounded-lg shadow-lg sticky top-28">
-                                        <ProductImage model={selectedModel} selections={selections} />
+                                        <ProductImage 
+                                            model={selectedModel} 
+                                            selections={selections}
+                                            onImageClick={setZoomedImage}
+                                        />
                                         <p className="text-center mt-4 text-lg text-gray-800 font-bold">{selectedModel.name}</p>
                                         <p className="text-center mt-1 text-sm text-gray-500">{selectedModel.description}</p>
                                     </div>
@@ -270,6 +344,8 @@ const App: React.FC = () => {
                                     onTagChange={setTag}
                                     customRange={customRange}
                                     onCustomRangeChange={setCustomRange}
+                                    specialRequest={specialRequest}
+                                    onSpecialRequestChange={setSpecialRequest}
                                 />
                            </div>
                         </div>
@@ -279,6 +355,7 @@ const App: React.FC = () => {
              <footer className="text-center p-4 mt-8 text-sm text-gray-500">
                 <p>&copy; {new Date().getFullYear()} Druck, a Baker Hughes business. All rights reserved.</p>
             </footer>
+            {zoomedImage && <ImageZoomModal image={zoomedImage} onClose={() => setZoomedImage(null)} />}
         </div>
     );
 };
