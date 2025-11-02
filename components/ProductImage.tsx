@@ -8,102 +8,27 @@ interface ProductImageProps {
     selections: Selections;
 }
 
-const getImageSrc = (model: ProductModel, selections: Selections): string => {
-    const { id: modelId } = model;
-    const { manifold: manifoldSelection, pressureRange, processConnection, explosionProof, housingType } = selections;
+interface ImageInfo {
+    src: string;
+    alt: string;
+    title: string;
+}
 
-    // --- 1. Check for Manifold Selection (Highest Priority) ---
-    if (manifoldSelection && manifoldSelection !== 'VN') {
-        if (modelId === 'RTX2300A' || modelId === 'RTX2400G') {
-            return images.manifold_ag_2_valve;
-        }
-        if (modelId === 'RTX2400K') {
-            return images.manifold_k_2_valve;
-        }
-        if (modelId === 'RTX2500D') {
-            if (['V3', 'V4'].includes(manifoldSelection)) {
-                return images.manifold_d_3_valve;
-            }
-            if (['V5', 'V6'].includes(manifoldSelection)) {
-                return images.manifold_d_5_valve;
-            }
-        }
-    }
-
-    // --- 2. Check for Base Transmitter Body ---
-    if (modelId === 'RTX2300A' || modelId === 'RTX2400G') {
-        const highPressureRanges = ['G7', 'G8', 'G9'];
-        const isHighPressure = pressureRange && highPressureRanges.includes(pressureRange);
-
-        // --- NEW GRANULAR IMAGE LOGIC ---
-        // Determine if a more robust-looking image set ('gt_5Mpa') should be used.
-        // This is triggered by high pressure ratings or specific combinations of
-        // explosion-proof certifications and housing types.
-
-        // Certifications like Flameproof ('D-') and Dust ('E-') often have heavier-duty housings.
-        const robustExplosionProofTypes = ['D-', 'E-']; 
-        const isRobustExplosionProof = explosionProof && robustExplosionProofTypes.includes(explosionProof);
-
-        let useRobustImageSet = false;
-
-        // Condition 1: High pressure models always use the robust image set.
-        if (isHighPressure) {
-            useRobustImageSet = true;
-        } 
-        // Condition 2 (Specific Combination): A robust certification with an NPT housing.
-        else if (isRobustExplosionProof && housingType === '1') {
-            useRobustImageSet = true;
-        }
-        // Condition 3 (Specific Combination): An "Increased Safety" cert with an M20 housing.
-        else if (explosionProof === 'F-' && housingType === '2') {
-             useRobustImageSet = true;
-        }
-        
-        if (!processConnection) {
-            // The base images currently use the same URL, but this maintains logical consistency.
-            return useRobustImageSet ? images.rtx2300_2400g_gt_5Mpa_base : images.rtx2300_2400g_le_5Mpa_base;
-        }
-
-        if (useRobustImageSet) {
-            switch (processConnection) {
-                case '1': return images.rtx2300_2400g_gt_5Mpa_conn_1;
-                case '2': return images.rtx2300_2400g_gt_5Mpa_conn_2;
-                case '3': return images.rtx2300_2400g_gt_5Mpa_conn_3;
-                case '4': return images.rtx2300_2400g_gt_5Mpa_conn_4;
-                default: return images.rtx2300_2400g_gt_5Mpa_base;
-            }
-        } else {
-             switch (processConnection) {
-                case '1': return images.rtx2300_2400g_le_5Mpa_conn_1;
-                case '2': return images.rtx2300_2400g_le_5Mpa_conn_2;
-                case '3': return images.rtx2300_2400g_le_5Mpa_conn_3;
-                case '4': return images.rtx2300_2400g_le_5Mpa_conn_4;
-                default: return images.rtx2300_2400g_le_5Mpa_base;
-            }
-        }
-    }
-
-    if (modelId === 'RTX2400K' || modelId === 'RTX2500D') {
-        return images.rtx2400k_2500d_base;
-    }
-
-    // --- 3. Fallback to default ---
-    return images.defaultImage;
-};
-
-
-export const ProductImage: React.FC<ProductImageProps> = ({ model, selections }) => {
-    const imageUrl = getImageSrc(model, selections);
-    const [imageStatus, setImageStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+// Sub-component to render a single image with its own loading and error states
+const SingleImage: React.FC<{ src: string, alt: string }> = ({ src, alt }) => {
+    const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
 
     useEffect(() => {
-        // When the image URL changes, reset the status to loading.
-        setImageStatus('loading');
-    }, [imageUrl]);
+        setStatus('loading');
+        const img = new Image();
+        img.src = src;
+        img.onload = () => setStatus('loaded');
+        img.onerror = () => setStatus('error');
+    }, [src]);
 
     return (
         <div className="relative w-full aspect-square bg-gray-100 rounded-md overflow-hidden">
-            {(imageStatus === 'loading') && (
+            {status === 'loading' && (
                 <div className="absolute inset-0 flex items-center justify-center" aria-label="Loading image">
                     <svg className="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -111,25 +36,114 @@ export const ProductImage: React.FC<ProductImageProps> = ({ model, selections })
                     </svg>
                 </div>
             )}
-            
-            {(imageStatus === 'error') && (
-                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-red-500 p-4" role="alert">
+            {status === 'error' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-red-500 p-4" role="alert">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mb-2" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
-                    <p className="text-sm font-semibold">Image failed to load</p>
-                 </div>
+                    <p className="text-sm font-semibold">Image not found</p>
+                </div>
             )}
-
-            <img 
-                src={imageUrl}
-                alt={`Technical drawing for ${model.name}`} 
-                className={`absolute inset-0 object-contain w-full h-full transition-opacity duration-300 ${imageStatus === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
-                onLoad={() => setImageStatus('loaded')}
-                onError={() => setImageStatus('error')}
-                // Hide from screen readers if not loaded, the status messages handle it.
-                aria-hidden={imageStatus !== 'loaded'}
+            <img
+                src={src}
+                alt={alt}
+                className={`absolute inset-0 object-contain w-full h-full transition-opacity duration-300 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
+                aria-hidden={status !== 'loaded'}
             />
+        </div>
+    );
+};
+
+const getImageSources = (model: ProductModel, selections: Selections): ImageInfo[] => {
+    const result: ImageInfo[] = [];
+    const { id: modelId } = model;
+    const { manifold: manifoldSelection, pressureRange, processConnection } = selections;
+
+    // 1. Base Transmitter Body Image
+    if (modelId === 'RTX2300A' || modelId === 'RTX2400G') {
+        result.push({
+            src: images.base_rtx2300_2400g,
+            alt: 'Technical drawing of RTX2300/2400G transmitter body',
+            title: 'Transmitter Basic Shape'
+        });
+    } else if (modelId === 'RTX2400K' || modelId === 'RTX2500D') {
+        result.push({
+            src: images.base_rtx2400k_2500d,
+            alt: 'Technical drawing of RTX2400K/2500D transmitter body',
+            title: 'Transmitter Basic Shape'
+        });
+    }
+
+    // 2. Pressure Connection Image (only for A and G models)
+    if ((modelId === 'RTX2300A' || modelId === 'RTX2400G') && processConnection) {
+        const highPressureRanges = ['G7', 'G8', 'G9'];
+        const isHighPressure = pressureRange && highPressureRanges.includes(pressureRange);
+
+        let connSrc = '';
+        if (isHighPressure) {
+            if (processConnection === '1') connSrc = images.conn_gt_5mpa_npt_female;
+            else if (processConnection === '2') connSrc = images.conn_gt_5mpa_npt_male;
+            else if (processConnection === '3') connSrc = images.conn_gt_5mpa_m20_male;
+            else if (processConnection === '4') connSrc = images.conn_gt_5mpa_g1_2_male;
+        } else {
+            if (processConnection === '1') connSrc = images.conn_le_5mpa_npt_female;
+            else if (processConnection === '2') connSrc = images.conn_le_5mpa_npt_male;
+            else if (processConnection === '3') connSrc = images.conn_le_5mpa_m20_male;
+            else if (processConnection === '4') connSrc = images.conn_le_5mpa_g1_2_male;
+        }
+
+        if (connSrc) {
+            result.push({
+                src: connSrc,
+                alt: 'Technical drawing of the selected pressure connection',
+                title: 'Pressure Connection'
+            });
+        }
+    }
+
+    // 3. Valve Manifold Image
+    if (manifoldSelection && manifoldSelection !== 'VN') {
+        let manifoldSrc = '';
+        if (modelId === 'RTX2300A' || modelId === 'RTX2400G') {
+            manifoldSrc = images.manifold_2_valve_ag;
+        } else if (modelId === 'RTX2400K') {
+            manifoldSrc = images.manifold_2_valve_k;
+        } else if (modelId === 'RTX2500D') {
+            if (['V3', 'V4'].includes(manifoldSelection)) manifoldSrc = images.manifold_3_valve_d;
+            if (['V5', 'V6'].includes(manifoldSelection)) manifoldSrc = images.manifold_5_valve_d;
+        }
+        if (manifoldSrc) {
+            result.push({
+                src: manifoldSrc,
+                alt: 'Technical drawing of the selected valve manifold',
+                title: 'Valve Manifold'
+            });
+        }
+    }
+
+    return result;
+};
+
+
+export const ProductImage: React.FC<ProductImageProps> = ({ model, selections }) => {
+    const imageSources = getImageSources(model, selections);
+
+    if (imageSources.length === 0) {
+        return (
+            <div className="relative w-full aspect-square bg-gray-100 rounded-md overflow-hidden flex items-center justify-center text-gray-500 text-center p-4">
+                <p>Select options to view product images.</p>
+            </div>
+        );
+    }
+    
+    return (
+        <div className="space-y-4">
+            {imageSources.map((img, index) => (
+                <div key={`${img.src}-${index}`}>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2 text-center">{img.title}</h3>
+                    <SingleImage src={img.src} alt={img.alt} />
+                </div>
+            ))}
         </div>
     );
 };

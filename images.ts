@@ -1,27 +1,27 @@
 
-export const defaultImage = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-1-rtx2300-2400g-base.png';
+// Base transmitter bodies. Sourced from PDF diagrams 3.4.1 and 3.4.4.
+export const base_rtx2300_2400g = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/base-rtx2300_2400g.png';
+export const base_rtx2400k_2500d = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/base-rtx2400k_2500d.png';
 
-// RTX2300A and RTX2400G Base Images
-export const rtx2300_2400g_le_5Mpa_base = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-1-rtx2300-2400g-base.png';
-export const rtx2300_2400g_gt_5Mpa_base = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-1-rtx2300-2400g-base-robust.png';
+// Pressure connections for RTX2300/2400G (<= 5MPa). Sourced from PDF diagram 3.4.2.
+export const conn_le_5mpa_npt_female = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/conn-le-5mpa-npt-female.png';
+export const conn_le_5mpa_npt_male = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/conn-le-5mpa-npt-male.png';
+export const conn_le_5mpa_m20_male = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/conn-le-5mpa-m20-male.png';
+export const conn_le_5mpa_g1_2_male = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/conn-le-5mpa-g1-2-male.png';
 
-// RTX2300A and RTX2400G Connection Images (<= 5 MPa)
-export const rtx2300_2400g_le_5Mpa_conn_1 = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-2-le-5Mpa-conn1-npt-female.png';
-export const rtx2300_2400g_le_5Mpa_conn_2 = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-2-le-5Mpa-conn2-npt-male.png';
-export const rtx2300_2400g_le_5Mpa_conn_3 = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-2-le-5Mpa-conn3-m20-male.png';
-export const rtx2300_2400g_le_5Mpa_conn_4 = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-2-le-5Mpa-conn4-g1-2-male.png';
+// Pressure connections for RTX2300/2400G (> 5MPa). Sourced from PDF diagram 3.4.3.
+export const conn_gt_5mpa_npt_female = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/conn-gt-5mpa-npt-female.png';
+export const conn_gt_5mpa_npt_male = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/conn-gt-5mpa-npt-male.png';
+export const conn_gt_5mpa_m20_male = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/conn-gt-5mpa-m20-male.png';
+export const conn_gt_5mpa_g1_2_male = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/conn-gt-5mpa-g1-2-male.png';
 
-// RTX2300A and RTX2400G Connection Images (> 5 MPa)
-export const rtx2300_2400g_gt_5Mpa_conn_1 = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-2-gt-5Mpa-conn1-npt-female.png';
-export const rtx2300_2400g_gt_5Mpa_conn_2 = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-2-gt-5Mpa-conn2-npt-male.png';
-export const rtx2300_2400g_gt_5Mpa_conn_3 = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-2-gt-5Mpa-conn3-m20-male.png';
-export const rtx2300_2400g_gt_5Mpa_conn_4 = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-2-gt-5Mpa-conn4-g1-2-male.png';
+// Note: RTX2400K and RTX2500D connections are integrated into the base body, so no separate connection image is typically shown.
 
-// RTX2400K and RTX2500D Base Image
-export const rtx2400k_2500d_base = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-3-rtx2400k-2500d-base.png';
+// Valve manifolds. Sourced from PDF section 3.5.
+export const manifold_2_valve_ag = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/manifold-2-valve-ag.png';
+export const manifold_2_valve_k = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/manifold-2-valve-k.png';
+export const manifold_3_valve_d = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/manifold-3-valve-d.png';
+export const manifold_5_valve_d = 'https://storage.googleapis.com/aai-web-samples/product-configurator-druck/manifold-5-valve-d.png';
 
-// Manifold Images
-export const manifold_ag_2_valve = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-4-manifold-ag-2-valve.png';
-export const manifold_k_2_valve = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-5-manifold-k-2-valve.png';
-export const manifold_d_3_valve = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-6-manifold-d-3-valve.png';
-export const manifold_d_5_valve = 'https://storage.googleapis.com/aai-web-samples/product-configurator/3-4-7-manifold-d-5-valve.png';
+// Fallback default image
+export const defaultImage = base_rtx2300_2400g;
