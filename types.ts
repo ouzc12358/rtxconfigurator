@@ -3,6 +3,9 @@ export interface Option {
     code: string;
     description: string;
     details?: string;
+    min?: number;
+    max?: number;
+    unit?: string;
 }
 
 export interface SelectionValidationResult {

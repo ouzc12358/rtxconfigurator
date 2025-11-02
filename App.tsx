@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Configurator } from './components/Configurator';
 import { Summary } from './components/Summary';
+import { ProductImage } from './components/ProductImage';
 import { productModels } from './data/productData';
 import type { Selections, ProductModel } from './types';
 
@@ -9,6 +10,7 @@ const App: React.FC = () => {
     const [selectedModelId, setSelectedModelId] = useState<string>(productModels[0].id);
     const [selections, setSelections] = useState<Selections>({});
     const [tag, setTag] = useState<string>('');
+    const [customRange, setCustomRange] = useState<{ low: string; high: string }>({ low: '', high: '' });
 
     const selectedModel = useMemo(() => {
         const model = productModels.find(m => m.id === selectedModelId);
@@ -22,6 +24,15 @@ const App: React.FC = () => {
     const handleModelChange = (modelId: string) => {
         setSelectedModelId(modelId);
         setSelections({}); // Reset selections when model changes
+        setCustomRange({ low: '', high: '' }); // Reset custom range
+    };
+
+    const handleSelectionsChange = (newSelections: Selections) => {
+        // Reset custom range if the pressure range selection changes
+        if (selections.pressureRange !== newSelections.pressureRange) {
+            setCustomRange({ low: '', high: '' });
+        }
+        setSelections(newSelections);
     };
     
     return (
@@ -60,11 +71,22 @@ const App: React.FC = () => {
                                 ))}
                             </div>
                         </div>
-                        <Configurator
-                            model={selectedModel}
-                            selections={selections}
-                            onSelectionChange={setSelections}
-                        />
+                        <div className="lg:grid lg:grid-cols-5 lg:gap-8">
+                            <div className="lg:col-span-2 mb-8 lg:mb-0">
+                                <div className="bg-white p-4 rounded-lg shadow-lg sticky top-28">
+                                    <ProductImage model={selectedModel} selections={selections} />
+                                    <p className="text-center mt-4 text-lg text-gray-800 font-bold">{selectedModel.name}</p>
+                                    <p className="text-center mt-1 text-sm text-gray-500">{selectedModel.description}</p>
+                                </div>
+                            </div>
+                            <div className="lg:col-span-3">
+                                <Configurator
+                                    model={selectedModel}
+                                    selections={selections}
+                                    onSelectionChange={handleSelectionsChange}
+                                />
+                            </div>
+                        </div>
                     </div>
                     <div className="lg:col-span-4 mt-8 lg:mt-0">
                        <div className="sticky top-28">
@@ -73,6 +95,8 @@ const App: React.FC = () => {
                                 selections={selections} 
                                 tag={tag}
                                 onTagChange={setTag}
+                                customRange={customRange}
+                                onCustomRangeChange={setCustomRange}
                             />
                        </div>
                     </div>

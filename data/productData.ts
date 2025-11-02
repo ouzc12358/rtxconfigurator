@@ -338,10 +338,10 @@ const rtx2300a_config: SelectionCategory[] = [
         title: 'Pressure Range',
         part: 'required',
         options: [
-            { code: 'A2', description: '0 to 40 kPa' },
-            { code: 'A5', description: '0 to 200 kPa' },
-            { code: 'A7', description: '0 to 1 MPa' },
-            { code: 'A9', description: '0 to 5 MPa' },
+            { code: 'A2', description: '0 to 40 kPa', min: 0, max: 40, unit: 'kPa' },
+            { code: 'A5', description: '0 to 200 kPa', min: 0, max: 200, unit: 'kPa' },
+            { code: 'A7', description: '0 to 1 MPa', min: 0, max: 1, unit: 'MPa' },
+            { code: 'A9', description: '0 to 5 MPa', min: 0, max: 5, unit: 'MPa' },
         ]
     },
     {
@@ -464,12 +464,12 @@ const rtx2400g_config: SelectionCategory[] = [
         title: 'Pressure Range',
         part: 'required',
         options: [
-            { code: 'G4', description: '-100 to 200 kPa' },
-            { code: 'G5', description: '-0.1 to 1 MPa' },
-            { code: 'G6', description: '-0.1 to 5 MPa' },
-            { code: 'G7', description: '-0.1 to 20 MPa' },
-            { code: 'G8', description: '-0.1 to 40 MPa' },
-            { code: 'G9', description: '-0.1 to 70 MPa' },
+            { code: 'G4', description: '-100 to 200 kPa', min: -100, max: 200, unit: 'kPa' },
+            { code: 'G5', description: '-0.1 to 1 MPa', min: -0.1, max: 1, unit: 'MPa' },
+            { code: 'G6', description: '-0.1 to 5 MPa', min: -0.1, max: 5, unit: 'MPa' },
+            { code: 'G7', description: '-0.1 to 20 MPa', min: -0.1, max: 20, unit: 'MPa' },
+            { code: 'G8', description: '-0.1 to 40 MPa', min: -0.1, max: 40, unit: 'MPa' },
+            { code: 'G9', description: '-0.1 to 70 MPa', min: -0.1, max: 70, unit: 'MPa' },
         ]
     },
     {
@@ -521,10 +521,10 @@ const rtx2400k_config: SelectionCategory[] = [
         title: 'Pressure Range',
         part: 'required',
         options: [
-            { code: 'G2', description: '-40 to 40 kPa' },
-            { code: 'G4', description: '-100 to 200 kPa' },
-            { code: 'G5', description: '-0.1 to 1 MPa' },
-            { code: 'G6', description: '-0.1 to 5 MPa' },
+            { code: 'G2', description: '-40 to 40 kPa', min: -40, max: 40, unit: 'kPa' },
+            { code: 'G4', description: '-100 to 200 kPa', min: -100, max: 200, unit: 'kPa' },
+            { code: 'G5', description: '-0.1 to 1 MPa', min: -0.1, max: 1, unit: 'MPa' },
+            { code: 'G6', description: '-0.1 to 5 MPa', min: -0.1, max: 5, unit: 'MPa' },
         ]
     },
     {
@@ -635,6 +635,147 @@ const rtx2400k_config: SelectionCategory[] = [
     ...manifoldSpectrum
 ];
 
+const rtx2500d_config: SelectionCategory[] = [
+    {
+        id: 'pressureType',
+        title: 'Pressure Type',
+        part: 'required',
+        options: [{ code: 'D', description: 'Differential Pressure' }]
+    },
+    {
+        id: 'wettedMaterial',
+        title: 'Wetted Parts Material',
+        part: 'required',
+        options: [
+            { code: 'A', description: '316L SS' },
+            { code: 'B', description: 'Hastelloy C-276' }
+        ]
+    },
+    {
+        id: 'diaphragmFillFluid',
+        title: 'Diaphragm Fill Fluid',
+        part: 'required',
+        options: [{ code: 'D', description: 'Silicone Oil' }]
+    },
+    {
+        id: 'pressureRange',
+        title: 'Pressure Range',
+        part: 'required',
+        options: [
+            { code: 'D2', description: '-6 to 6 kPa', min: -6, max: 6, unit: 'kPa' },
+            { code: 'D3', description: '-40 to 40 kPa', min: -40, max: 40, unit: 'kPa' },
+            { code: 'D4', description: '-200 to 200 kPa', min: -200, max: 200, unit: 'kPa' },
+            { code: 'D5', description: '-1 to 1 MPa', min: -1, max: 1, unit: 'MPa' },
+        ]
+    },
+    {
+        id: 'processConnection',
+        title: 'Process Connection',
+        part: 'required',
+        options: [
+            { code: '5', description: '1/4 - 18 NPT Female, Rear Vent' },
+            { code: '6', description: '1/4 - 18 NPT Female, Side Vent' }
+        ]
+    },
+    {
+        id: 'chamberBolts',
+        title: 'Chamber Bolts',
+        part: 'required',
+        options: [
+            { code: '1', description: 'Carbon Steel' },
+            { code: '2', description: '316 SS' }
+        ]
+    },
+    ...sharedHousingAndExplosionOptions,
+    {
+        id: 'mountingBracket',
+        title: 'Mounting Bracket',
+        part: 'additional',
+        options: [
+            { code: 'B1', description: 'Horizontal, Carbon Steel' },
+            { code: 'B2', description: 'Horizontal, 304 SS' },
+            { code: 'B3', description: 'Horizontal, 316 SS' },
+            { code: 'B4', description: 'Vertical, Carbon Steel' },
+            { code: 'B5', description: 'Vertical, 304 SS' },
+            { code: 'B6', description: 'Vertical, 316 SS' },
+            { code: 'BN', description: 'None' },
+        ]
+    },
+    {
+        id: 'electricalConnector',
+        title: 'Electrical Connector',
+        part: 'additional',
+        options: electricalConnectors,
+        validate: validateElectricalConnector,
+    },
+    {
+        id: 'weldNeck',
+        title: 'Weld Neck Connector',
+        part: 'additional',
+        options: allWeldNeckOptions,
+        validate: validateWeldNeck_KD,
+    },
+    {
+        id: 'additionalCert',
+        title: 'Additional Certification',
+        part: 'additional',
+        options: [{ code: '0', description: 'None' }]
+    },
+    {
+        id: 'lightningProtection',
+        title: 'Lightning Protection',
+        part: 'additional',
+        options: [
+            { code: 'A', description: 'None' },
+            { code: 'B', description: 'Lightning protection' }
+        ]
+    },
+    {
+        id: 'alarmCurrent',
+        title: 'Alarm Current',
+        part: 'additional',
+        options: [
+            { code: 'C', description: '3.6 mA' },
+            { code: 'D', description: '22.8 mA' }
+        ]
+    },
+    {
+        id: 'acceptanceDocs',
+        title: 'Acceptance Documents',
+        part: 'additional',
+        options: [
+            { code: 'E', description: 'None' },
+            { code: 'F1', description: 'Submit acceptance documents' }
+        ]
+    },
+    {
+        id: 'displayUnit',
+        title: 'Display Unit',
+        part: 'additional',
+        options: displayUnits
+    },
+    {
+        id: 'outputUnit',
+        title: 'Output Units',
+        part: 'additional',
+        options: displayUnits
+    },
+    {
+        id: 'manifold',
+        title: 'Valve Manifold',
+        part: 'additional',
+        options: allManifoldOptions,
+        validate: validateManifold_D,
+    },
+    {
+        id: 'sealMaterial',
+        title: 'Seal Material',
+        part: 'additional',
+        options: [{ code: 'X', description: 'None' }]
+    },
+    ...manifoldSpectrum
+];
+
 export const productModels: ProductModel[] = [
     {
         id: 'RTX2300A',
@@ -657,5 +798,11 @@ export const productModels: ProductModel[] = [
         description: 'Differential Pressure Gauge Transmitter',
         configuration: rtx2400k_config,
     },
-    // The configuration for RTX2400D was not provided in the original file.
+    {
+        id: 'RTX2500D',
+        name: 'RTX 2500D',
+        baseCode: '2500D',
+        description: 'Differential Pressure Transmitter',
+        configuration: rtx2500d_config,
+    },
 ];
