@@ -74,9 +74,9 @@ export const Configurator: React.FC<ConfiguratorProps> = ({ model, selections, o
 
     return (
         <div className="space-y-8">
-            {renderSection("3. Required Options", requiredCategories)}
-            {renderSection("4. Additional Options", additionalCategories)}
-            {isManifoldSelected && renderSection("5. Valve Manifold Spectrum", manifoldCategories)}
+            {renderSection("2. Required Options", requiredCategories)}
+            {renderSection("3. Additional Options", additionalCategories)}
+            {isManifoldSelected && renderSection("4. Valve Manifold Spectrum", manifoldCategories)}
         </div>
     );
 };

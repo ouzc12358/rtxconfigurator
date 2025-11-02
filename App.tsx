@@ -31,22 +31,17 @@ const loadState = () => {
 const App: React.FC = () => {
     const [initialState] = useState(loadState);
 
-    const [selectedModelId, setSelectedModelId] = useState<string>(initialState?.selectedModelId || productModels[0].id);
+    const [selectedModelId, setSelectedModelId] = useState<string>(initialState?.selectedModelId || '');
     const [selections, setSelections] = useState<Selections>(initialState?.selections || {});
     const [tag, setTag] = useState<string>(initialState?.tag || '');
     const [customRange, setCustomRange] = useState<{ low: string; high: string }>(initialState?.customRange || { low: '', high: '' });
     
-    // State for the quick configuration input fields
-    const [requiredCode, setRequiredCode] = useState('');
-    const [additionalCode, setAdditionalCode] = useState('');
+    // State for the single quick configuration input field
+    const [fullModelCode, setFullModelCode] = useState('');
 
     const selectedModel = useMemo(() => {
-        const model = productModels.find(m => m.id === selectedModelId);
-        if (!model) {
-            // This fallback is handled by the useEffect below, but is a good safeguard.
-            return productModels[0];
-        }
-        return model;
+        if (!selectedModelId) return null;
+        return productModels.find(m => m.id === selectedModelId) || null;
     }, [selectedModelId]);
 
     // Effect to save state to localStorage whenever it changes
@@ -67,46 +62,23 @@ const App: React.FC = () => {
     
     // Effect to validate the loaded model ID and reset if it's no longer valid
     useEffect(() => {
-        const modelExists = productModels.some(m => m.id === selectedModelId);
-        if (!modelExists) {
-            console.warn("Saved model ID is invalid. Resetting to default model.");
-            setSelectedModelId(productModels[0].id);
-            setSelections({});
-            setCustomRange({ low: '', high: '' });
+        if (selectedModelId) {
+            const modelExists = productModels.some(m => m.id === selectedModelId);
+            if (!modelExists) {
+                console.warn("Saved model ID is invalid. Resetting configuration.");
+                handleReset();
+            }
         }
     }, [selectedModelId]);
-    
-    // EFFECT: Selections -> Inputs (Two-way binding)
-    // Updates the code input fields whenever the user makes a selection via dropdowns.
-    useEffect(() => {
-        if (!selectedModel) return;
 
-        const requiredCategories = selectedModel.configuration.filter(c => c.part === 'required');
-        const generatedRequiredCode = requiredCategories
-            .map(category => selections[category.id] || '')
-            .join('');
-        
-        const additionalCategories = selectedModel.configuration.filter(c => c.part === 'additional');
-        const generatedAdditionalCode = additionalCategories
-            .map(category => selections[category.id] || '')
-            .join('');
-
-        if (requiredCode !== generatedRequiredCode) {
-            setRequiredCode(generatedRequiredCode);
-        }
-        if (additionalCode !== generatedAdditionalCode) {
-            setAdditionalCode(generatedAdditionalCode);
-        }
-
-    }, [selections, selectedModelId]);
-
-
-    const handleModelChange = (modelId: string) => {
+    const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const modelId = e.target.value;
         setSelectedModelId(modelId);
-        setSelections({}); // Reset selections when model changes
-        setCustomRange({ low: '', high: '' }); // Reset custom range
-        setRequiredCode('');
-        setAdditionalCode('');
+        // Reset everything else when model changes
+        setSelections({});
+        setCustomRange({ low: '', high: '' });
+        setTag('');
+        setFullModelCode('');
     };
 
     const handleSelectionsChange = (newSelections: Selections) => {
@@ -117,21 +89,32 @@ const App: React.FC = () => {
         setSelections(newSelections);
     };
 
-    const handleRequiredCodeChange = (value: string) => {
-        setRequiredCode(value);
-    
-        if (!selectedModel) return;
-        const newSelections = { ...selections }; 
-        const requiredCategories = selectedModel.configuration.filter(c => c.part === 'required');
-        let codeRemainder = value;
-        let sequenceBroken = false;
-    
+    const handleApplyFullCode = () => {
+        const code = fullModelCode.toUpperCase().trim();
+        if (!code) return;
+
+        const matchedModel = [...productModels]
+            .sort((a, b) => b.baseCode.length - a.baseCode.length)
+            .find(model => code.startsWith(model.baseCode.toUpperCase()));
+
+        if (!matchedModel) {
+            alert("Could not find a matching product model for the code provided. Please check the model number.");
+            return;
+        }
+
+        // Set model and reset state before applying new selections
+        setSelectedModelId(matchedModel.id);
+        setCustomRange({ low: '', high: '' });
+        setTag('');
+
+        let codeForOptions = code.substring(matchedModel.baseCode.length).replace(/^-+|-+$/g, '');
+        const newSelections: Selections = {};
+
+        // Process Required Code (sequentially)
+        const requiredCategories = matchedModel.configuration.filter(c => c.part === 'required');
+        let codeRemainder = codeForOptions;
+
         for (const category of requiredCategories) {
-            if (sequenceBroken) {
-                delete newSelections[category.id];
-                continue;
-            }
-    
             const sortedOptions = [...category.options].sort((a, b) => b.code.length - a.code.length);
             let matchFound = false;
             for (const option of sortedOptions) {
@@ -143,50 +126,41 @@ const App: React.FC = () => {
                 }
             }
             if (!matchFound) {
-                delete newSelections[category.id];
-                sequenceBroken = true;
+                break;
             }
         }
-        handleSelectionsChange(newSelections);
-    };
-    
-    const handleAdditionalCodeChange = (value: string) => {
-        setAdditionalCode(value);
-    
-        if (!selectedModel) return;
-    
-        const newSelections = { ...selections };
-        const additionalCategories = selectedModel.configuration.filter(c => c.part === 'additional' || c.part === 'manifold');
-        
-        additionalCategories.forEach(cat => delete newSelections[cat.id]);
-        
+
+        // Process Additional Code (non-sequentially) from the remainder
+        const addCodeToParse = codeRemainder.replace(/\s/g, '');
+        const additionalCategories = matchedModel.configuration.filter(c => c.part === 'additional' || c.part === 'manifold');
         const allAdditionalOptions = additionalCategories.flatMap(cat => cat.options.map(opt => ({ ...opt, categoryId: cat.id })));
         allAdditionalOptions.sort((a, b) => b.code.length - a.code.length);
         
-        let codeRemainder = value;
-        while (codeRemainder.length > 0) {
+        let tempAdditionalCode = addCodeToParse;
+        while (tempAdditionalCode.length > 0) {
             let matchFound = false;
             for (const option of allAdditionalOptions) {
-                if (!newSelections[option.categoryId] && codeRemainder.startsWith(option.code)) {
+                if (!newSelections[option.categoryId] && tempAdditionalCode.startsWith(option.code)) {
                     newSelections[option.categoryId] = option.code;
-                    codeRemainder = codeRemainder.substring(option.code.length);
+                    tempAdditionalCode = tempAdditionalCode.substring(option.code.length);
                     matchFound = true;
                     break;
                 }
             }
             if (!matchFound) break;
         }
-        handleSelectionsChange(newSelections);
+        
+        setSelections(newSelections);
+        setFullModelCode('');
     };
     
     const handleReset = () => {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
-        setSelectedModelId(productModels[0].id);
+        setSelectedModelId('');
         setSelections({});
         setTag('');
         setCustomRange({ low: '', high: '' });
-        setRequiredCode('');
-        setAdditionalCode('');
+        setFullModelCode('');
     };
 
     return (
@@ -217,88 +191,90 @@ const App: React.FC = () => {
             </header>
 
             <main className="container mx-auto p-4 sm:p-6 lg:p-8">
-                <div className="lg:grid lg:grid-cols-12 lg:gap-8">
-                    <div className="lg:col-span-8">
-                         <div className="bg-white p-6 rounded-lg shadow-lg mb-6">
-                            <h2 className="text-lg font-semibold text-gray-800 border-b pb-3 mb-4">1. Quick Configuration (Optional)</h2>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label htmlFor="required-code-input" className="block text-sm font-medium text-gray-700 mb-1">Required Options Code</label>
-                                    <input
-                                        id="required-code-input"
-                                        type="text"
-                                        value={requiredCode}
-                                        onChange={(e) => handleRequiredCodeChange(e.target.value.toUpperCase())}
-                                        placeholder="e.g., AEDA730HY2B-"
-                                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm font-mono focus:ring-blue-500 focus:border-blue-500"
-                                        aria-label="Required Options Code Input"
-                                    />
-                                </div>
-                                <div>
-                                    <label htmlFor="additional-code-input" className="block text-sm font-medium text-gray-700 mb-1">Additional Options Code</label>
-                                    <input
-                                        id="additional-code-input"
-                                        type="text"
-                                        value={additionalCode}
-                                        onChange={(e) => handleAdditionalCodeChange(e.target.value.toUpperCase())}
-                                        placeholder="e.g., BNE3WNOACFX5VNX"
-                                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm font-mono focus:ring-blue-500 focus:border-blue-500"
-                                        aria-label="Additional Options Code Input"
-                                    />
-                                </div>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-2">Paste the model code strings to automatically select the options below.</p>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-lg shadow-lg mb-6">
-                            <h2 className="text-lg font-semibold text-gray-800 border-b pb-3 mb-4">2. Select Product Model</h2>
-                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {productModels.map((model: ProductModel) => (
-                                    <button
-                                        key={model.id}
-                                        onClick={() => handleModelChange(model.id)}
-                                        className={`p-4 rounded-md text-center font-semibold transition-all duration-200 ease-in-out transform hover:-translate-y-1 ${
-                                            selectedModelId === model.id
-                                                ? 'bg-blue-600 text-white shadow-lg'
-                                                : 'bg-gray-200 text-gray-700 hover:bg-blue-100'
-                                        }`}
-                                    >
-                                        {model.name}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="lg:grid lg:grid-cols-5 lg:gap-8">
-                            <div className="lg:col-span-2 mb-8 lg:mb-0">
-                                <div className="bg-white p-4 rounded-lg shadow-lg sticky top-28">
-                                    <ProductImage model={selectedModel} selections={selections} />
-                                    <p className="text-center mt-4 text-lg text-gray-800 font-bold">{selectedModel.name}</p>
-                                    <p className="text-center mt-1 text-sm text-gray-500">{selectedModel.description}</p>
-                                </div>
-                            </div>
-                            <div className="lg:col-span-3">
-                                <Configurator
-                                    model={selectedModel}
-                                    selections={selections}
-                                    onSelectionChange={handleSelectionsChange}
+                <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
+                    <h2 className="text-lg font-semibold text-gray-800 border-b pb-3 mb-4">1. Start Configuration</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 items-start">
+                        <div>
+                            <label htmlFor="full-model-code-input" className="block text-sm font-medium text-gray-700">
+                                Quick Configuration by Full Code
+                            </label>
+                            <div className="mt-1 flex space-x-2">
+                                <input
+                                    id="full-model-code-input"
+                                    type="text"
+                                    value={fullModelCode}
+                                    onChange={(e) => setFullModelCode(e.target.value)}
+                                    placeholder="e.g., RTX2500-D..."
+                                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm font-mono focus:ring-blue-500 focus:border-blue-500"
+                                    aria-label="Full Model Code Input"
                                 />
+                                <button
+                                    onClick={handleApplyFullCode}
+                                    className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                >
+                                    Apply
+                                </button>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">Paste a full model code to auto-select the model and options.</p>
+                        </div>
+                        <div className="flex items-center pt-1">
+                             <span className="hidden md:inline-block text-gray-400 font-semibold mr-4">OR</span>
+                             <div>
+                                <label htmlFor="model-select" className="block text-sm font-medium text-gray-700">
+                                    Select Manually
+                                </label>
+                                <select
+                                    id="model-select"
+                                    value={selectedModelId}
+                                    onChange={handleModelChange}
+                                    className="mt-1 w-full appearance-none p-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer"
+                                >
+                                    <option value="" disabled>-- Choose a Product Model --</option>
+                                    {productModels.map((model: ProductModel) => (
+                                        <option key={model.id} value={model.id}>
+                                            {model.name} - {model.description}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
-                    </div>
-                    <div className="lg:col-span-4 mt-8 lg:mt-0">
-                       <div className="sticky top-28">
-                           <Summary 
-                                model={selectedModel} 
-                                selections={selections} 
-                                tag={tag}
-                                onTagChange={setTag}
-                                customRange={customRange}
-                                onCustomRangeChange={setCustomRange}
-                            />
-                       </div>
                     </div>
                 </div>
+
+                {selectedModel && (
+                    <div className="lg:grid lg:grid-cols-12 lg:gap-8">
+                        <div className="lg:col-span-8">
+                            <div className="lg:grid lg:grid-cols-5 lg:gap-8">
+                                <div className="lg:col-span-2 mb-8 lg:mb-0">
+                                    <div className="bg-white p-4 rounded-lg shadow-lg sticky top-28">
+                                        <ProductImage model={selectedModel} selections={selections} />
+                                        <p className="text-center mt-4 text-lg text-gray-800 font-bold">{selectedModel.name}</p>
+                                        <p className="text-center mt-1 text-sm text-gray-500">{selectedModel.description}</p>
+                                    </div>
+                                </div>
+                                <div className="lg:col-span-3">
+                                    <Configurator
+                                        model={selectedModel}
+                                        selections={selections}
+                                        onSelectionChange={handleSelectionsChange}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="lg:col-span-4 mt-8 lg:mt-0">
+                           <div className="sticky top-28">
+                               <Summary 
+                                    model={selectedModel} 
+                                    selections={selections} 
+                                    tag={tag}
+                                    onTagChange={setTag}
+                                    customRange={customRange}
+                                    onCustomRangeChange={setCustomRange}
+                                />
+                           </div>
+                        </div>
+                    </div>
+                )}
             </main>
              <footer className="text-center p-4 mt-8 text-sm text-gray-500">
                 <p>&copy; {new Date().getFullYear()} Druck, a Baker Hughes business. All rights reserved.</p>
