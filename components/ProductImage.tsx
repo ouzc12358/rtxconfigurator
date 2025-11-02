@@ -10,7 +10,7 @@ interface ProductImageProps {
 
 const getImageSrc = (model: ProductModel, selections: Selections): string => {
     const { id: modelId } = model;
-    const { manifold: manifoldSelection, pressureRange, processConnection } = selections;
+    const { manifold: manifoldSelection, pressureRange, processConnection, explosionProof, housingType } = selections;
 
     // --- 1. Check for Manifold Selection (Highest Priority) ---
     if (manifoldSelection && manifoldSelection !== 'VN') {
@@ -35,11 +35,36 @@ const getImageSrc = (model: ProductModel, selections: Selections): string => {
         const highPressureRanges = ['G7', 'G8', 'G9'];
         const isHighPressure = pressureRange && highPressureRanges.includes(pressureRange);
 
+        // --- NEW GRANULAR IMAGE LOGIC ---
+        // Determine if a more robust-looking image set ('gt_5Mpa') should be used.
+        // This is triggered by high pressure ratings or specific combinations of
+        // explosion-proof certifications and housing types.
+
+        // Certifications like Flameproof ('D-') and Dust ('E-') often have heavier-duty housings.
+        const robustExplosionProofTypes = ['D-', 'E-']; 
+        const isRobustExplosionProof = explosionProof && robustExplosionProofTypes.includes(explosionProof);
+
+        let useRobustImageSet = false;
+
+        // Condition 1: High pressure models always use the robust image set.
+        if (isHighPressure) {
+            useRobustImageSet = true;
+        } 
+        // Condition 2 (Specific Combination): A robust certification with an NPT housing.
+        else if (isRobustExplosionProof && housingType === '1') {
+            useRobustImageSet = true;
+        }
+        // Condition 3 (Specific Combination): An "Increased Safety" cert with an M20 housing.
+        else if (explosionProof === 'F-' && housingType === '2') {
+             useRobustImageSet = true;
+        }
+        
         if (!processConnection) {
-            return isHighPressure ? images.rtx2300_2400g_gt_5Mpa_base : images.rtx2300_2400g_le_5Mpa_base;
+            // The base images currently use the same URL, but this maintains logical consistency.
+            return useRobustImageSet ? images.rtx2300_2400g_gt_5Mpa_base : images.rtx2300_2400g_le_5Mpa_base;
         }
 
-        if (isHighPressure) {
+        if (useRobustImageSet) {
             switch (processConnection) {
                 case '1': return images.rtx2300_2400g_gt_5Mpa_conn_1;
                 case '2': return images.rtx2300_2400g_gt_5Mpa_conn_2;
