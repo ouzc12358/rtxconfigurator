@@ -80,7 +80,8 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
         fullConfigText,
         rangeError,
         selectedRangeOption,
-        isCustomRangeValidAndSet
+        isCustomRangeValidAndSet,
+        selectedOptionsList
     } = useMemo(() => {
         const pressureRangeCategory = model.configuration.find(c => c.id === 'pressureRange');
         const selectedPressureRangeCode = selections.pressureRange;
@@ -115,6 +116,19 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
         const transmitterLines = generateTransmitterModelNumber(model, selections, customRange, selectedRangeOption, isCustomRangeValidAndSet);
         const manifoldNumber = generateManifoldModelNumber(model, selections);
         
+        const selectedOptionsList = model.configuration
+            .map(category => {
+                const selectedCode = selections[category.id];
+                if (!selectedCode) return null;
+                const option = category.options.find(o => o.code === selectedCode);
+                return option ? {
+                    category: category.title,
+                    code: option.code,
+                    description: option.description
+                } : null;
+            })
+            .filter((item): item is { category: string; code: string; description: string; } => item !== null);
+
         const configDetails: string[] = [`Model: ${model.name}`];
         if (tag) {
             configDetails.push(`Tag Number: ${tag}`);
@@ -133,14 +147,8 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
         
         configDetails.push("\n--- Configuration Details ---");
         
-        model.configuration.forEach(category => {
-            const selectedCode = selections[category.id];
-            if (selectedCode) {
-                const selectedOption = category.options.find(o => o.code === selectedCode);
-                if (selectedOption) {
-                    configDetails.push(`${category.title}: ${selectedOption.description} (${selectedOption.code})`);
-                }
-            }
+        selectedOptionsList.forEach(item => {
+            configDetails.push(`${item.category}: ${item.description} (${item.code})`);
         });
 
         if (isCustomRangeValidAndSet) {
@@ -154,6 +162,7 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
             rangeError: error,
             selectedRangeOption: selectedRangeOption,
             isCustomRangeValidAndSet: isCustomRangeValidAndSet,
+            selectedOptionsList
         };
 
     }, [model, selections, tag, customRange]);
@@ -163,6 +172,41 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
             setIsCopied(true);
             setTimeout(() => setIsCopied(false), 2000);
         });
+    };
+
+    const handleExportToFile = () => {
+        const exportData = {
+            productModel: model.name,
+            tagNumber: tag || 'N/A',
+            modelNumber: {
+                transmitter: {
+                    line1: transmitterModelLines[0],
+                    line2: transmitterModelLines[1],
+                    line3: `(${isCustomRangeValidAndSet ? 'Calibrated' : 'Selected'} Range): ${transmitterModelLines[2]}`,
+                    line4: `(Example Request): ${transmitterModelLines[3]}`,
+                },
+                manifold: manifoldModelNumber || 'N/A',
+            },
+            customCalibration: isCustomRangeValidAndSet ? {
+                low: customRange.low,
+                high: customRange.high,
+                unit: selectedRangeOption?.unit || '',
+            } : 'N/A',
+            selectedOptions: selectedOptionsList,
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        link.download = `${model.name.replace(/\s/g, '_')}_Configuration_${date}.json`;
+        
+        document.body.appendChild(link);
+        link.click();
+        
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     };
 
     return (
@@ -231,29 +275,37 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
             <div className="border-t pt-4">
                 <h3 className="font-semibold text-md text-gray-700 mb-2">Selected Options:</h3>
                 <ul className="space-y-1 text-sm text-gray-600 max-h-60 overflow-y-auto">
-                    {model.configuration.map(category => {
-                        const selectedCode = selections[category.id];
-                        if (!selectedCode) return null;
-                        const option = category.options.find(o => o.code === selectedCode);
-                        return option ? (
-                            <li key={category.id} className="flex justify-between">
-                                <span className="font-medium">{category.title}:</span>
-                                <span className="text-right">{option.description}</span>
-                            </li>
-                        ) : null;
-                    })}
+                     {selectedOptionsList.map(option => (
+                        <li key={option.category} className="flex justify-between">
+                            <span className="font-medium">{option.category}:</span>
+                            <span className="text-right">{option.description}</span>
+                        </li>
+                    ))}
                 </ul>
             </div>
             
-            <button
-                onClick={handleCopyToClipboard}
-                className="mt-6 w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                {isCopied ? 'Copied!' : 'Copy to Clipboard'}
-            </button>
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                    onClick={handleCopyToClipboard}
+                    className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                    aria-label="Copy configuration to clipboard"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    {isCopied ? 'Copied!' : 'Copy to Clipboard'}
+                </button>
+                 <button
+                    onClick={handleExportToFile}
+                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                    aria-label="Export configuration to a JSON file"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export to File
+                </button>
+            </div>
         </div>
     );
 };
