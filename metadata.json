@@ -1,0 +1,5 @@
+{
+  "name": "Druck RTX2000 Series Configurator",
+  "description": "An interactive product configurator for the Druck RTX2000 series pressure transmitters. Allows users to select options based on technical specifications, handles selection conflicts, and generates a complete model number for ordering.",
+  "requestFramePermissions": []
+}
