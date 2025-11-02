@@ -1,21 +1,72 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Configurator } from './components/Configurator';
 import { Summary } from './components/Summary';
 import { ProductImage } from './components/ProductImage';
 import { productModels } from './data/productData';
 import type { Selections, ProductModel } from './types';
 
+// Key for localStorage
+const LOCAL_STORAGE_KEY = 'druckRtxConfiguratorState';
+
+// Function to load state from localStorage
+const loadState = () => {
+    try {
+        const serializedState = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (serializedState === null) {
+            return undefined;
+        }
+        const parsed = JSON.parse(serializedState);
+        // Basic validation to ensure the loaded object has expected keys
+        if ('selectedModelId' in parsed && 'selections' in parsed && 'tag' in parsed && 'customRange' in parsed) {
+            return parsed;
+        }
+        return undefined;
+    } catch (err) {
+        console.error("Could not load state from localStorage", err);
+        return undefined;
+    }
+};
+
 const App: React.FC = () => {
-    const [selectedModelId, setSelectedModelId] = useState<string>(productModels[0].id);
-    const [selections, setSelections] = useState<Selections>({});
-    const [tag, setTag] = useState<string>('');
-    const [customRange, setCustomRange] = useState<{ low: string; high: string }>({ low: '', high: '' });
+    const [initialState] = useState(loadState);
+
+    const [selectedModelId, setSelectedModelId] = useState<string>(initialState?.selectedModelId || productModels[0].id);
+    const [selections, setSelections] = useState<Selections>(initialState?.selections || {});
+    const [tag, setTag] = useState<string>(initialState?.tag || '');
+    const [customRange, setCustomRange] = useState<{ low: string; high: string }>(initialState?.customRange || { low: '', high: '' });
+
+    // Effect to save state to localStorage whenever it changes
+    useEffect(() => {
+        const stateToSave = {
+            selectedModelId,
+            selections,
+            tag,
+            customRange,
+        };
+        try {
+            const serializedState = JSON.stringify(stateToSave);
+            localStorage.setItem(LOCAL_STORAGE_KEY, serializedState);
+        } catch (err) {
+            console.error("Could not save state to localStorage", err);
+        }
+    }, [selectedModelId, selections, tag, customRange]);
+    
+    // Effect to validate the loaded model ID and reset if it's no longer valid
+    useEffect(() => {
+        const modelExists = productModels.some(m => m.id === selectedModelId);
+        if (!modelExists) {
+            console.warn("Saved model ID is invalid. Resetting to default model.");
+            setSelectedModelId(productModels[0].id);
+            setSelections({});
+            setCustomRange({ low: '', high: '' });
+        }
+    }, [selectedModelId]);
 
     const selectedModel = useMemo(() => {
         const model = productModels.find(m => m.id === selectedModelId);
         if (!model) {
-            console.error("Selected model not found, defaulting to first model.");
+            // This fallback is handled by the useEffect above, but is a good safeguard.
             return productModels[0];
         }
         return model;
@@ -35,6 +86,14 @@ const App: React.FC = () => {
         setSelections(newSelections);
     };
     
+    const handleReset = () => {
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        setSelectedModelId(productModels[0].id);
+        setSelections({});
+        setTag('');
+        setCustomRange({ low: '', high: '' });
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
             <header className="bg-white shadow-md sticky top-0 z-20">
@@ -45,6 +104,18 @@ const App: React.FC = () => {
                             <h1 className="text-xl md:text-2xl font-bold text-gray-700">
                                 RTX2000 Series Configurator
                             </h1>
+                        </div>
+                        <div>
+                             <button
+                                onClick={handleReset}
+                                className="flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                aria-label="Reset and clear configuration"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.181-3.183m-4.991-2.695v-4.992m0 0h-4.992m4.992 0l-3.181-3.183a8.25 8.25 0 00-11.664 0l-3.181 3.183" />
+                                </svg>
+                                Reset
+                            </button>
                         </div>
                     </div>
                 </div>
