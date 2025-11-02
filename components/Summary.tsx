@@ -224,13 +224,10 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
 
         const doc = new jsPDF();
         
-        // FIX: Replaced remote URL with a Base64 data URI to prevent CORS errors.
-        const logoUrl = 'data:image/jpeg;base64,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';
+        const logoUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAoALADASIAAhEBAxEB/8QAGwABAQACAwEAAAAAAAAAAAAAAAYDBwECBAX/xAAwEAABAwIEBAQEBwAAAAAAAAABAgMEBREABgcSITFBUQgTImEVFjJCcYGRobHB0f/EABkBAQADAQEAAAAAAAAAAAAAAAABAgMEBf/EACERAQABAwQCAwAAAAAAAAAAAAABAgMREiExQVEEE2Fx/9oADAMBAAIRAxEAPwD2OMYxgDGxjAGNjGAMbGMAdsY1gCMeR+IuPXuGOHhWKbSmas+uUzFS047ykhSybk2O4A7bn5GuA/8AmHU//paB+oO//wCq7I4+rz+TTDjX1/f9I8sH+M+qS8x2n9PUMY8s/8AmLU+3wNA/UHf/wDU8l+L2Vcf5LDo0rKcjoFHYfUtEhurLhWpNrpsmOu1tx33rbFwc+c1w5V9Ixx15cK+p6ljYxjmXMbGMAdsYxgDGxjAGNjGAPk3xF8RarwHxTQMuYy6NVWZ8NEpTjj6mykrdcbta3+E3+Zrwz/n/AFb/AOhKf9Qc/wDlT3bPsgyvPqezT84y+lV2M0suttzGEuhCiCAoBQIBAJG3cjvXE/wDD/hD/AOyWRfp7f8V3Y/F4kY8VWPP6vLycLO5zGpHj3/P6rf/oSj/UHP8A5U2/DPjzVOPk1iROy6NSY9MW0hKmX1OFZWFK3uBtnb4mvQv+H/AAh/9ksj/T2/4rocl5JlWSsPsZNl1IojL5CnG4MVDAVa9iQlIBIvtfY1lmcXh+HNVXy+i+Hgzp5zVH1xjYxjyHoY2MYA7YxjAGNjGAMbGMAdsYxgB2xjGAIuYV+lZVSZNWrc5iDBjJK3XnlBKUgC5O5/meK+KPirmnH2tU3hHglUhNPmvoZflNBQVLJJFrj+VgG6jvfbYAm1x/GHj/VeP+IVcN8IVKSjK2nCy9JiqKVTiDZZCiPyN9AbWURe9gBXrHg/wCAuV8D5bHq9Xis1bOKg2FvzXkBfklQBCGiRZI33FlG5uQLC1mZ1T5fU/0/k9XwS4VpfCXDlLynT2h4UdoKccP+o+s3W4fmpRJ+gAFgK38YxzltsbGMAbGMAbGMAY2MYA//2Q==';
 
-        const addContent = (imgData?: string) => {
-            if (imgData) {
-                doc.addImage(imgData, 'JPEG', 15, 10, 50, 8); // x, y, w, h
-            }
+        const addContent = (imgData: string) => {
+            doc.addImage(imgData, 'JPEG', 15, 10, 50, 10); // x, y, w, h
 
             doc.setFontSize(18);
             doc.setFont(undefined, 'bold');
@@ -306,32 +303,14 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
             doc.save(`${model.name.replace(/\s/g, '_')}_Configuration_${date}.pdf`);
         };
 
-        const img = new Image();
-        img.crossOrigin = 'Anonymous';
-        img.onload = function() {
-            const canvas = document.createElement('canvas');
-            // FIX: Replaced `this` with the `img` variable from the closure. TypeScript incorrectly
-            // types `this` as `GlobalEventHandlers` within an `onload` handler, causing type errors.
-            // Using the explicitly declared `img` (HTMLImageElement) resolves this.
-            const scaleX = img.naturalWidth / img.naturalWidth;
-            const scaleY = img.naturalHeight / img.naturalHeight;
-            const scale = Math.min(scaleX, scaleY);
-            canvas.width = img.naturalWidth / scale;
-            canvas.height = img.naturalHeight / scale;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                const dataURL = canvas.toDataURL('image/jpeg');
-                addContent(dataURL);
-            } else {
-                 addContent();
-            }
-        };
-        img.onerror = function() {
-            console.error("Could not load logo for PDF. Proceeding without it.");
-            addContent(); // Proceed without the logo
-        };
-        img.src = logoUrl;
+        // Directly use the data URI. jsPDF can handle it without needing an Image object.
+        // This avoids potential browser issues with loading data URIs into images.
+        try {
+            addContent(logoUrl);
+        } catch (error) {
+            console.error("Failed to generate PDF:", error);
+            alert("An error occurred while generating the PDF. Please try again.");
+        }
     };
 
 

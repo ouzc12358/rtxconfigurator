@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Configurator } from './components/Configurator';
 import { Summary } from './components/Summary';
@@ -158,17 +159,49 @@ const App: React.FC = () => {
     };
 
     const handleApplyFullCode = () => {
-        const code = fullModelCode.toUpperCase().trim();
+        // Rigorously clean the input string to handle copy-paste issues
+        // Replaces en-dashes/em-dashes with hyphens and removes all whitespace
+        const code = fullModelCode
+            .toUpperCase()
+            .replace(/[\u2013\u2014]/g, '-') // Normalize dashes
+            .replace(/\s/g, ''); // Remove all whitespace
+
         if (!code) return;
 
-        const matchedModel = [...productModels]
-            .sort((a, b) => b.baseCode.length - a.baseCode.length)
-            .find(model => code.startsWith(model.baseCode.toUpperCase()));
+        let matchedInfo: { model: ProductModel, prefixLength: number } | null = null;
+        
+        const prefixes = new Map<string, ProductModel>();
+        for (const model of productModels) {
+            const baseCodeWithHyphen = model.baseCode.toUpperCase();
+            const baseCodeWithoutHyphen = baseCodeWithHyphen.replace(/-/g, '');
+            
+            prefixes.set(baseCodeWithHyphen, model);
+            prefixes.set(baseCodeWithoutHyphen, model);
 
-        if (!matchedModel) {
+            const modelNumber = baseCodeWithHyphen.split('-')[0];
+            const isUnique = productModels.filter(m => m.baseCode.toUpperCase().startsWith(modelNumber)).length === 1;
+            if (isUnique) {
+                if (!prefixes.has(modelNumber)) {
+                    prefixes.set(modelNumber, model);
+                }
+            }
+        }
+
+        const sortedPrefixes = Array.from(prefixes.keys()).sort((a, b) => b.length - a.length);
+
+        for (const prefix of sortedPrefixes) {
+            if (code.startsWith(prefix)) {
+                matchedInfo = { model: prefixes.get(prefix)!, prefixLength: prefix.length };
+                break;
+            }
+        }
+
+        if (!matchedInfo) {
             alert("Could not find a matching product model for the code provided. Please check the model number.");
             return;
         }
+        
+        const { model: matchedModel, prefixLength } = matchedInfo;
 
         // Set model and reset state before applying new selections
         setSelectedModelId(matchedModel.id);
@@ -176,7 +209,8 @@ const App: React.FC = () => {
         setTag('');
         setSpecialRequest('');
 
-        let codeForOptions = code.substring(matchedModel.baseCode.length).replace(/^-+|-+$/g, '');
+        // Only remove leading hyphens, as other hyphens can be part of a valid code (e.g., 'A-')
+        let codeForOptions = code.substring(prefixLength).replace(/^-+/, '');
         const newSelections: Selections = {};
 
         // Process Required Code (sequentially)
@@ -184,23 +218,38 @@ const App: React.FC = () => {
         let codeRemainder = codeForOptions;
 
         for (const category of requiredCategories) {
-            const sortedOptions = [...category.options].sort((a, b) => b.code.length - a.code.length);
-            let matchFound = false;
-            for (const option of sortedOptions) {
+            let bestMatch: { optionCode: string, matchedLength: number } | null = null;
+            
+            // Find the best (longest) possible match for the current category
+            for (const option of category.options) {
+                // Check for exact match
                 if (codeRemainder.startsWith(option.code)) {
-                    newSelections[category.id] = option.code;
-                    codeRemainder = codeRemainder.substring(option.code.length);
-                    matchFound = true;
-                    break;
+                    if (!bestMatch || option.code.length > bestMatch.matchedLength) {
+                        bestMatch = { optionCode: option.code, matchedLength: option.code.length };
+                    }
+                }
+                // Check for lenient match (e.g., user entered 'A' for 'A-')
+                if (option.code.endsWith('-') && option.code.length > 1) {
+                    const codeWithoutHyphen = option.code.slice(0, -1);
+                    if (codeRemainder.startsWith(codeWithoutHyphen)) {
+                         if (!bestMatch || codeWithoutHyphen.length > bestMatch.matchedLength) {
+                            bestMatch = { optionCode: option.code, matchedLength: codeWithoutHyphen.length };
+                        }
+                    }
                 }
             }
-            if (!matchFound) {
+            
+            if (bestMatch) {
+                newSelections[category.id] = bestMatch.optionCode;
+                codeRemainder = codeRemainder.substring(bestMatch.matchedLength);
+            } else {
+                // No match found for this required category, so we stop parsing required options.
                 break;
             }
         }
 
         // Process Additional Code (non-sequentially) from the remainder
-        const addCodeToParse = codeRemainder.replace(/\s/g, '');
+        const addCodeToParse = codeRemainder;
         const additionalCategories = matchedModel.configuration.filter(c => c.part === 'additional' || c.part === 'manifold');
         const allAdditionalOptions = additionalCategories.flatMap(cat => cat.options.map(opt => ({ ...opt, categoryId: cat.id })));
         allAdditionalOptions.sort((a, b) => b.code.length - a.code.length);
