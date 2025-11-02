@@ -1,13 +1,13 @@
 
-import type { ProductModel, SelectionValidationResult, Selections, SelectionCategory, Option } from '../types';
+import type { ProductModel, SelectionValidationResult, Selections, SelectionCategory, Option, TFunction } from '../types';
 
 // Validation Functions
-const validateElectricalConnector = (optionCode: string, selections: Selections): SelectionValidationResult => {
+const validateElectricalConnector = (optionCode: string, selections: Selections, t: TFunction): SelectionValidationResult => {
     const explosionProof = selections.explosionProof;
     const housingType = selections.housingType;
 
     if (!housingType) {
-        return { isValid: false, reason: "Please select a 'Housing Type' first." };
+        return { isValid: false, reason: t('validation_selectHousing') };
     }
 
     // Thread type matching housing
@@ -15,32 +15,32 @@ const validateElectricalConnector = (optionCode: string, selections: Selections)
     const isNPTConnector = ['E6', 'E7', 'E8', 'E9', 'EA'].includes(optionCode);
 
     if (isM20Connector && housingType !== '2') {
-        return { isValid: false, reason: "Requires M20 housing (Type 2)." };
+        return { isValid: false, reason: t('validation_requiresM20') };
     }
     if (isNPTConnector && housingType !== '1') {
-        return { isValid: false, reason: "Requires 1/2 NPT housing (Type 1)." };
+        return { isValid: false, reason: t('validation_requiresNPT') };
     }
     
     // Explosion proof type matching
     if (explosionProof && ['D-', 'E-', 'F-'].includes(explosionProof)) { // Explosion proof types
         if (['E1', 'E6', 'E4', 'E5', 'E9', 'EA'].includes(optionCode)) { // Non-explosion proof connectors or dust plugs
-            return { isValid: false, reason: `Not suitable for explosion proof type ${explosionProof}. Requires an explosion-proof electrical connector.` };
+            return { isValid: false, reason: t('validation_notForExplosionProof').replace('{type}', explosionProof) };
         }
     }
     return { isValid: true };
 };
 
-const validateManifold_AG = (optionCode: string, selections: Selections): SelectionValidationResult => {
+const validateManifold_AG = (optionCode: string, selections: Selections, t: TFunction): SelectionValidationResult => {
     if (selections.weldNeck && selections.weldNeck !== 'WN') {
-        return { isValid: false, reason: "Cannot select a manifold when a Weld Neck Connector is chosen." };
+        return { isValid: false, reason: t('validation_noManifoldWithWeldNeck') };
     }
     if (!['V1', 'V2', 'VN'].includes(optionCode)) {
-        return { isValid: false, reason: "This model only supports 2-valve manifolds (V1, V2)." };
+        return { isValid: false, reason: t('validation_only2ValveManifold') };
     }
     return { isValid: true };
 };
 
-const validateWeldNeck_AG = (optionCode: string, selections: Selections): SelectionValidationResult => {
+const validateWeldNeck_AG = (optionCode: string, selections: Selections, t: TFunction): SelectionValidationResult => {
     // "None" is always a valid choice.
     if (optionCode === 'WN') {
         return { isValid: true };
@@ -48,13 +48,13 @@ const validateWeldNeck_AG = (optionCode: string, selections: Selections): Select
 
     // Check for conflict with manifold selection.
     if (selections.manifold && selections.manifold !== 'VN') {
-        return { isValid: false, reason: "Cannot select a Weld Neck Connector when a manifold is chosen." };
+        return { isValid: false, reason: t('validation_noWeldNeckWithManifold') };
     }
     
     // A Process Connection must be selected first.
     const processConnection = selections.processConnection;
     if (!processConnection) {
-        return { isValid: false, reason: "Please select a 'Process Connection' first to see compatible options."};
+        return { isValid: false, reason: t('validation_selectProcessConnection') };
     }
 
     const isTransmitterFemale = processConnection === '1'; // e.g., 1/2 NPT Female
@@ -73,40 +73,40 @@ const validateWeldNeck_AG = (optionCode: string, selections: Selections): Select
     
     // If we reach here, it's an invalid combination. Provide a specific reason.
     if (isTransmitterFemale) {
-        return { isValid: false, reason: "Requires a male weld neck (W1, W2, W3) for a female process connection." };
+        return { isValid: false, reason: t('validation_requiresMaleWeldNeck') };
     }
     if (isTransmitterMale) {
-        return { isValid: false, reason: "Requires a female weld neck for a male process connection." };
+        return { isValid: false, reason: t('validation_requiresFemaleWeldNeck') };
     }
 
     // Fallback for any unforeseen case.
-    return { isValid: false, reason: "Incompatible with selected Process Connection." };
+    return { isValid: false, reason: t('validation_incompatibleProcessConnection') };
 };
 
 
-const validateManifold_K = (optionCode: string, selections: Selections): SelectionValidationResult => {
+const validateManifold_K = (optionCode: string, selections: Selections, t: TFunction): SelectionValidationResult => {
      if (selections.weldNeck && selections.weldNeck !== 'WN') {
-        return { isValid: false, reason: "Cannot select a manifold when a Weld Neck Connector is chosen." };
+        return { isValid: false, reason: t('validation_noManifoldWithWeldNeck') };
     }
     if (!['V1', 'V2', 'VN'].includes(optionCode)) {
-        return { isValid: false, reason: "This model only supports 2-valve manifolds (V1, V2)." };
+        return { isValid: false, reason: t('validation_only2ValveManifold') };
     }
     return { isValid: true };
 };
 
-const validateManifold_D = (optionCode: string, selections: Selections): SelectionValidationResult => {
+const validateManifold_D = (optionCode: string, selections: Selections, t: TFunction): SelectionValidationResult => {
     if (selections.weldNeck && selections.weldNeck !== 'WN') {
-        return { isValid: false, reason: "Cannot select a manifold when a Weld Neck Connector is chosen." };
+        return { isValid: false, reason: t('validation_noManifoldWithWeldNeck') };
     }
     if (!['V3', 'V4', 'V5', 'V6', 'VN'].includes(optionCode)) {
-        return { isValid: false, reason: "This model only supports 3-valve (V3, V4) and 5-valve (V5, V6) manifolds." };
+        return { isValid: false, reason: t('validation_only35ValveManifold') };
     }
     return { isValid: true };
 };
 
-const validateWeldNeck_KD = (optionCode: string, selections: Selections): SelectionValidationResult => {
+const validateWeldNeck_KD = (optionCode: string, selections: Selections, t: TFunction): SelectionValidationResult => {
     if (optionCode !== 'WN') {
-        return { isValid: false, reason: "Weld Neck Connectors are not applicable for this model." };
+        return { isValid: false, reason: t('validation_noWeldNeckApplicable') };
     }
     return { isValid: true };
 };

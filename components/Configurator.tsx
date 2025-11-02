@@ -2,14 +2,16 @@
 import React from 'react';
 import type { ProductModel, Selections, SelectionCategory } from '../types';
 import { SelectionGroup } from './SelectionGroup';
+import type { uiTranslations } from '../data/translations';
 
 interface ConfiguratorProps {
     model: ProductModel;
     selections: Selections;
     onSelectionChange: (selections: Selections) => void;
+    t: (key: keyof typeof uiTranslations.en) => string;
 }
 
-export const Configurator: React.FC<ConfiguratorProps> = ({ model, selections, onSelectionChange }) => {
+export const Configurator: React.FC<ConfiguratorProps> = ({ model, selections, onSelectionChange, t }) => {
 
     const handleSelect = (categoryId: string, optionCode: string) => {
         const newSelections: Selections = {
@@ -47,9 +49,9 @@ export const Configurator: React.FC<ConfiguratorProps> = ({ model, selections, o
         onSelectionChange(newSelections);
     };
 
-    const renderSection = (title: string, categories: SelectionCategory[]) => (
+    const renderSection = (titleKey: keyof typeof uiTranslations.en, categories: SelectionCategory[]) => (
         <div className="bg-white p-6 rounded-lg shadow-lg mb-6">
-            <h2 className="text-lg font-semibold text-gray-800 border-b pb-3 mb-4">{title}</h2>
+            <h2 className="text-lg font-semibold text-gray-800 border-b pb-3 mb-4">{t(titleKey)}</h2>
             <div className="space-y-6">
                 {categories.map((category) => (
                      <SelectionGroup
@@ -58,6 +60,7 @@ export const Configurator: React.FC<ConfiguratorProps> = ({ model, selections, o
                         selectedValue={selections[category.id]}
                         allSelections={selections}
                         onSelect={(optionCode) => handleSelect(category.id, optionCode)}
+                        t={t}
                     />
                 ))}
             </div>
@@ -74,9 +77,9 @@ export const Configurator: React.FC<ConfiguratorProps> = ({ model, selections, o
 
     return (
         <div className="space-y-8">
-            {renderSection("2. Required Options", requiredCategories)}
-            {renderSection("3. Additional Options", additionalCategories)}
-            {isManifoldSelected && renderSection("4. Valve Manifold Spectrum", manifoldCategories)}
+            {renderSection("requiredOptionsTitle", requiredCategories)}
+            {renderSection("additionalOptionsTitle", additionalCategories)}
+            {isManifoldSelected && renderSection("manifoldOptionsTitle", manifoldCategories)}
         </div>
     );
 };

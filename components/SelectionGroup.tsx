@@ -1,14 +1,17 @@
+
 import React from 'react';
 import type { SelectionCategory, Selections } from '../types';
+import type { uiTranslations } from '../data/translations';
 
 interface SelectionGroupProps {
     category: SelectionCategory;
     selectedValue?: string;
     allSelections: Selections;
     onSelect: (optionCode: string) => void;
+    t: (key: keyof typeof uiTranslations.en, ...args: any[]) => string;
 }
 
-export const SelectionGroup: React.FC<SelectionGroupProps> = ({ category, selectedValue, allSelections, onSelect }) => {
+export const SelectionGroup: React.FC<SelectionGroupProps> = ({ category, selectedValue, allSelections, onSelect, t }) => {
     
     const selectedOptionDetails = selectedValue ? category.options.find(o => o.code === selectedValue)?.details : null;
     
@@ -24,9 +27,9 @@ export const SelectionGroup: React.FC<SelectionGroupProps> = ({ category, select
                     onChange={(e) => onSelect(e.target.value)}
                     className="w-full appearance-none p-3 pr-10 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer"
                 >
-                    <option value="" disabled>-- Select an option --</option>
+                    <option value="" disabled>{t('selectOption')}</option>
                     {category.options.map(option => {
-                        const validation = category.validate ? category.validate(option.code, allSelections) : { isValid: true };
+                        const validation = category.validate ? category.validate(option.code, allSelections, t) : { isValid: true };
                         const isDisabled = !validation.isValid;
 
                         return (

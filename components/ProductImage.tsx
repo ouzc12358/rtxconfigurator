@@ -2,15 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import type { ProductModel, Selections, ImageInfo } from '../types';
 import * as images from '../images';
+import type { uiTranslations } from '../data/translations';
 
 interface ProductImageProps {
     model: ProductModel;
     selections: Selections;
     onImageClick: (image: ImageInfo) => void;
+    t: (key: keyof typeof uiTranslations.en) => string;
 }
 
 // Sub-component to render a single image with its own loading and error states
-const SingleImage: React.FC<{ src: string, alt: string, onClick: () => void }> = ({ src, alt, onClick }) => {
+const SingleImage: React.FC<{ src: string, alt: string, onClick: () => void, t: (key: keyof typeof uiTranslations.en) => string; }> = ({ src, alt, onClick, t }) => {
     const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
 
     useEffect(() => {
@@ -27,7 +29,7 @@ const SingleImage: React.FC<{ src: string, alt: string, onClick: () => void }> =
             onClick={onClick}
         >
             {status === 'loading' && (
-                <div className="absolute inset-0 flex items-center justify-center" aria-label="Loading image">
+                <div className="absolute inset-0 flex items-center justify-center" aria-label={t('loadingImage')}>
                     <svg className="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -39,7 +41,7 @@ const SingleImage: React.FC<{ src: string, alt: string, onClick: () => void }> =
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mb-2" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
-                    <p className="text-sm font-semibold">Image not found</p>
+                    <p className="text-sm font-semibold">{t('imageNotFound')}</p>
                 </div>
             )}
             <img
@@ -61,14 +63,14 @@ const getImageSources = (model: ProductModel, selections: Selections): ImageInfo
     if (modelId === 'RTX2300A' || modelId === 'RTX2400G') {
         result.push({
             src: images.base_rtx2300_2400g,
-            alt: 'Technical drawing of RTX2300/2400G transmitter body',
-            title: 'Transmitter Basic Shape'
+            alt: model.t?.('imgAlt_body_2300_2400g') || 'Technical drawing of RTX2300/2400G transmitter body',
+            title: model.t?.('imgTitle_body') || 'Transmitter Basic Shape'
         });
     } else if (modelId === 'RTX2400K' || modelId === 'RTX2500D') {
         result.push({
             src: images.base_rtx2400k_2500d,
-            alt: 'Technical drawing of RTX2400K/2500D transmitter body',
-            title: 'Transmitter Basic Shape'
+            alt: model.t?.('imgAlt_body_2400k_2500d') || 'Technical drawing of RTX2400K/2500D transmitter body',
+            title: model.t?.('imgTitle_body') || 'Transmitter Basic Shape'
         });
     }
 
@@ -109,8 +111,8 @@ const getImageSources = (model: ProductModel, selections: Selections): ImageInfo
         if (connSrc) {
             result.push({
                 src: connSrc,
-                alt: 'Technical drawing of the selected pressure connection',
-                title: 'Pressure Connection'
+                alt: model.t?.('imgAlt_pressureConnection') || 'Technical drawing of the selected pressure connection',
+                title: model.t?.('imgTitle_pressureConnection') || 'Pressure Connection'
             });
         }
     }
@@ -129,8 +131,8 @@ const getImageSources = (model: ProductModel, selections: Selections): ImageInfo
         if (manifoldSrc) {
             result.push({
                 src: manifoldSrc,
-                alt: 'Technical drawing of the selected valve manifold',
-                title: 'Valve Manifold'
+                alt: model.t?.('imgAlt_manifold') || 'Technical drawing of the selected valve manifold',
+                title: model.t?.('imgTitle_manifold') || 'Valve Manifold'
             });
         }
     }
@@ -139,13 +141,13 @@ const getImageSources = (model: ProductModel, selections: Selections): ImageInfo
 };
 
 
-export const ProductImage: React.FC<ProductImageProps> = ({ model, selections, onImageClick }) => {
+export const ProductImage: React.FC<ProductImageProps> = ({ model, selections, onImageClick, t }) => {
     const imageSources = getImageSources(model, selections);
 
     if (imageSources.length === 0) {
         return (
             <div className="relative w-full aspect-square bg-gray-100 rounded-md overflow-hidden flex items-center justify-center text-gray-500 text-center p-4">
-                <p>Select options to view product images.</p>
+                <p>{t('selectOptionsToViewImages')}</p>
             </div>
         );
     }
@@ -159,6 +161,7 @@ export const ProductImage: React.FC<ProductImageProps> = ({ model, selections, o
                         src={img.src} 
                         alt={img.alt}
                         onClick={() => onImageClick(img)}
+                        t={t}
                     />
                 </div>
             ))}

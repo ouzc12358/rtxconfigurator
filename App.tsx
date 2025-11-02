@@ -3,7 +3,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Configurator } from './components/Configurator';
 import { Summary } from './components/Summary';
 import { ProductImage } from './components/ProductImage';
-import { productModels } from './data/productData';
+import { productModels as baseProductModels } from './data/productData';
+import { getTranslatedProductData } from './data/i18n';
+import { uiTranslations } from './data/translations';
 import type { Selections, ProductModel, ImageInfo } from './types';
 
 // Key for localStorage
@@ -32,9 +34,10 @@ const loadState = () => {
 interface ImageZoomModalProps {
     image: ImageInfo;
     onClose: () => void;
+    t: (key: keyof typeof uiTranslations.en) => string;
 }
 
-const ImageZoomModal: React.FC<ImageZoomModalProps> = ({ image, onClose }) => {
+const ImageZoomModal: React.FC<ImageZoomModalProps> = ({ image, onClose, t }) => {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
@@ -73,7 +76,7 @@ const ImageZoomModal: React.FC<ImageZoomModalProps> = ({ image, onClose }) => {
                 <button 
                     onClick={onClose}
                     className="absolute top-2 right-2 z-10 bg-gray-100 rounded-full p-1 text-gray-600 hover:bg-gray-300 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                    aria-label="Close image view"
+                    aria-label={t('closeImageView')}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -106,10 +109,19 @@ const App: React.FC = () => {
     // State for the image zoom modal
     const [zoomedImage, setZoomedImage] = useState<ImageInfo | null>(null);
 
+    // State for language
+    const [language, setLanguage] = useState<'en' | 'cn'>('en');
+
+    // Translation function and translated data
+    const t = (key: keyof typeof uiTranslations.en) => {
+        return uiTranslations[language][key] || uiTranslations.en[key];
+    };
+    const translatedProductModels = useMemo(() => getTranslatedProductData(language), [language]);
+
     const selectedModel = useMemo(() => {
         if (!selectedModelId) return null;
-        return productModels.find(m => m.id === selectedModelId) || null;
-    }, [selectedModelId]);
+        return translatedProductModels.find(m => m.id === selectedModelId) || null;
+    }, [selectedModelId, translatedProductModels]);
 
     // Effect to save state to localStorage whenever it changes
     useEffect(() => {
@@ -131,7 +143,7 @@ const App: React.FC = () => {
     // Effect to validate the loaded model ID and reset if it's no longer valid
     useEffect(() => {
         if (selectedModelId) {
-            const modelExists = productModels.some(m => m.id === selectedModelId);
+            const modelExists = baseProductModels.some(m => m.id === selectedModelId);
             if (!modelExists) {
                 console.warn("Saved model ID is invalid. Resetting configuration.");
                 handleReset();
@@ -171,7 +183,7 @@ const App: React.FC = () => {
         let matchedInfo: { model: ProductModel, prefixLength: number } | null = null;
         
         const prefixes = new Map<string, ProductModel>();
-        for (const model of productModels) {
+        for (const model of baseProductModels) {
             const baseCodeWithHyphen = model.baseCode.toUpperCase();
             const baseCodeWithoutHyphen = baseCodeWithHyphen.replace(/-/g, '');
             
@@ -179,7 +191,7 @@ const App: React.FC = () => {
             prefixes.set(baseCodeWithoutHyphen, model);
 
             const modelNumber = baseCodeWithHyphen.split('-')[0];
-            const isUnique = productModels.filter(m => m.baseCode.toUpperCase().startsWith(modelNumber)).length === 1;
+            const isUnique = baseProductModels.filter(m => m.baseCode.toUpperCase().startsWith(modelNumber)).length === 1;
             if (isUnique) {
                 if (!prefixes.has(modelNumber)) {
                     prefixes.set(modelNumber, model);
@@ -197,7 +209,7 @@ const App: React.FC = () => {
         }
 
         if (!matchedInfo) {
-            alert("Could not find a matching product model for the code provided. Please check the model number.");
+            alert(t('alert_modelNotFound'));
             return;
         }
         
@@ -281,6 +293,10 @@ const App: React.FC = () => {
         setSpecialRequest('');
         setFullModelCode('');
     };
+    
+    const toggleLanguage = () => {
+        setLanguage(prev => prev === 'en' ? 'cn' : 'en');
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
@@ -290,19 +306,26 @@ const App: React.FC = () => {
                         <div className="flex items-center">
                             <img src="https://www.bakerhughes.com/sites/bakerhughes/files/2021-10/druck_no_tagline_web.jpg" alt="Druck Logo" className="h-8 w-auto mr-4"/>
                             <h1 className="text-xl md:text-2xl font-bold text-gray-700">
-                                RTX2000 Series Configurator
+                                {t('appTitle')}
                             </h1>
                         </div>
-                        <div>
+                        <div className="flex items-center space-x-2">
+                             <button
+                                onClick={toggleLanguage}
+                                className="px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                aria-label="Toggle language"
+                             >
+                                 中文/English
+                             </button>
                              <button
                                 onClick={handleReset}
                                 className="flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                                aria-label="Reset and clear configuration"
+                                aria-label={t('resetAriaLabel')}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.181-3.183m-4.991-2.695v-4.992m0 0h-4.992m4.992 0l-3.181-3.183a8.25 8.25 0 00-11.664 0l-3.181 3.183" />
                                 </svg>
-                                Reset
+                                {t('reset')}
                             </button>
                         </div>
                     </div>
@@ -311,11 +334,11 @@ const App: React.FC = () => {
 
             <main className="container mx-auto p-4 sm:p-6 lg:p-8">
                 <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
-                    <h2 className="text-lg font-semibold text-gray-800 border-b pb-3 mb-4">1. Start Configuration</h2>
+                    <h2 className="text-lg font-semibold text-gray-800 border-b pb-3 mb-4">{t('startConfig')}</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 items-start">
                         <div>
                             <label htmlFor="full-model-code-input" className="block text-sm font-medium text-gray-700">
-                                Quick Configuration by Full Code
+                                {t('quickConfig')}
                             </label>
                             <div className="mt-1 flex space-x-2">
                                 <input
@@ -323,24 +346,24 @@ const App: React.FC = () => {
                                     type="text"
                                     value={fullModelCode}
                                     onChange={(e) => setFullModelCode(e.target.value)}
-                                    placeholder="e.g., RTX2500-D..."
+                                    placeholder={t('quickConfigPlaceholder')}
                                     className="w-full p-2 border border-gray-300 rounded-md shadow-sm font-mono focus:ring-blue-500 focus:border-blue-500"
-                                    aria-label="Full Model Code Input"
+                                    aria-label={t('quickConfigAriaLabel')}
                                 />
                                 <button
                                     onClick={handleApplyFullCode}
                                     className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                                 >
-                                    Apply
+                                    {t('apply')}
                                 </button>
                             </div>
-                            <p className="text-xs text-gray-500 mt-2">Paste a full model code to auto-select the model and options.</p>
+                            <p className="text-xs text-gray-500 mt-2">{t('quickConfigHelp')}</p>
                         </div>
                         <div className="flex items-center pt-1">
-                             <span className="hidden md:inline-block text-gray-400 font-semibold mr-4">OR</span>
+                             <span className="hidden md:inline-block text-gray-400 font-semibold mr-4">{t('or')}</span>
                              <div>
                                 <label htmlFor="model-select" className="block text-sm font-medium text-gray-700">
-                                    Select Manually
+                                    {t('selectManually')}
                                 </label>
                                 <select
                                     id="model-select"
@@ -348,8 +371,8 @@ const App: React.FC = () => {
                                     onChange={handleModelChange}
                                     className="mt-1 w-full appearance-none p-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer"
                                 >
-                                    <option value="" disabled>-- Choose a Product Model --</option>
-                                    {productModels.map((model: ProductModel) => (
+                                    <option value="" disabled>{t('chooseModel')}</option>
+                                    {translatedProductModels.map((model: ProductModel) => (
                                         <option key={model.id} value={model.id}>
                                             {model.name} - {model.description}
                                         </option>
@@ -370,6 +393,7 @@ const App: React.FC = () => {
                                             model={selectedModel} 
                                             selections={selections}
                                             onImageClick={setZoomedImage}
+                                            t={t}
                                         />
                                         <p className="text-center mt-4 text-lg text-gray-800 font-bold">{selectedModel.name}</p>
                                         <p className="text-center mt-1 text-sm text-gray-500">{selectedModel.description}</p>
@@ -380,6 +404,7 @@ const App: React.FC = () => {
                                         model={selectedModel}
                                         selections={selections}
                                         onSelectionChange={handleSelectionsChange}
+                                        t={t}
                                     />
                                 </div>
                             </div>
@@ -395,6 +420,7 @@ const App: React.FC = () => {
                                     onCustomRangeChange={setCustomRange}
                                     specialRequest={specialRequest}
                                     onSpecialRequestChange={setSpecialRequest}
+                                    t={t}
                                 />
                            </div>
                         </div>
@@ -402,9 +428,9 @@ const App: React.FC = () => {
                 )}
             </main>
              <footer className="text-center p-4 mt-8 text-sm text-gray-500">
-                <p>&copy; {new Date().getFullYear()} Druck, a Baker Hughes business. All rights reserved.</p>
+                <p>{t('footerText').replace('{year}', new Date().getFullYear().toString())}</p>
             </footer>
-            {zoomedImage && <ImageZoomModal image={zoomedImage} onClose={() => setZoomedImage(null)} />}
+            {zoomedImage && <ImageZoomModal image={zoomedImage} onClose={() => setZoomedImage(null)} t={t} />}
         </div>
     );
 };
