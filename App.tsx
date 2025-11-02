@@ -35,6 +35,19 @@ const App: React.FC = () => {
     const [selections, setSelections] = useState<Selections>(initialState?.selections || {});
     const [tag, setTag] = useState<string>(initialState?.tag || '');
     const [customRange, setCustomRange] = useState<{ low: string; high: string }>(initialState?.customRange || { low: '', high: '' });
+    
+    // State for the quick configuration input fields
+    const [requiredCode, setRequiredCode] = useState('');
+    const [additionalCode, setAdditionalCode] = useState('');
+
+    const selectedModel = useMemo(() => {
+        const model = productModels.find(m => m.id === selectedModelId);
+        if (!model) {
+            // This fallback is handled by the useEffect below, but is a good safeguard.
+            return productModels[0];
+        }
+        return model;
+    }, [selectedModelId]);
 
     // Effect to save state to localStorage whenever it changes
     useEffect(() => {
@@ -62,20 +75,38 @@ const App: React.FC = () => {
             setCustomRange({ low: '', high: '' });
         }
     }, [selectedModelId]);
+    
+    // EFFECT: Selections -> Inputs (Two-way binding)
+    // Updates the code input fields whenever the user makes a selection via dropdowns.
+    useEffect(() => {
+        if (!selectedModel) return;
 
-    const selectedModel = useMemo(() => {
-        const model = productModels.find(m => m.id === selectedModelId);
-        if (!model) {
-            // This fallback is handled by the useEffect above, but is a good safeguard.
-            return productModels[0];
+        const requiredCategories = selectedModel.configuration.filter(c => c.part === 'required');
+        const generatedRequiredCode = requiredCategories
+            .map(category => selections[category.id] || '')
+            .join('');
+        
+        const additionalCategories = selectedModel.configuration.filter(c => c.part === 'additional');
+        const generatedAdditionalCode = additionalCategories
+            .map(category => selections[category.id] || '')
+            .join('');
+
+        if (requiredCode !== generatedRequiredCode) {
+            setRequiredCode(generatedRequiredCode);
         }
-        return model;
-    }, [selectedModelId]);
+        if (additionalCode !== generatedAdditionalCode) {
+            setAdditionalCode(generatedAdditionalCode);
+        }
+
+    }, [selections, selectedModelId]);
+
 
     const handleModelChange = (modelId: string) => {
         setSelectedModelId(modelId);
         setSelections({}); // Reset selections when model changes
         setCustomRange({ low: '', high: '' }); // Reset custom range
+        setRequiredCode('');
+        setAdditionalCode('');
     };
 
     const handleSelectionsChange = (newSelections: Selections) => {
@@ -85,6 +116,68 @@ const App: React.FC = () => {
         }
         setSelections(newSelections);
     };
+
+    const handleRequiredCodeChange = (value: string) => {
+        setRequiredCode(value);
+    
+        if (!selectedModel) return;
+        const newSelections = { ...selections }; 
+        const requiredCategories = selectedModel.configuration.filter(c => c.part === 'required');
+        let codeRemainder = value;
+        let sequenceBroken = false;
+    
+        for (const category of requiredCategories) {
+            if (sequenceBroken) {
+                delete newSelections[category.id];
+                continue;
+            }
+    
+            const sortedOptions = [...category.options].sort((a, b) => b.code.length - a.code.length);
+            let matchFound = false;
+            for (const option of sortedOptions) {
+                if (codeRemainder.startsWith(option.code)) {
+                    newSelections[category.id] = option.code;
+                    codeRemainder = codeRemainder.substring(option.code.length);
+                    matchFound = true;
+                    break;
+                }
+            }
+            if (!matchFound) {
+                delete newSelections[category.id];
+                sequenceBroken = true;
+            }
+        }
+        handleSelectionsChange(newSelections);
+    };
+    
+    const handleAdditionalCodeChange = (value: string) => {
+        setAdditionalCode(value);
+    
+        if (!selectedModel) return;
+    
+        const newSelections = { ...selections };
+        const additionalCategories = selectedModel.configuration.filter(c => c.part === 'additional' || c.part === 'manifold');
+        
+        additionalCategories.forEach(cat => delete newSelections[cat.id]);
+        
+        const allAdditionalOptions = additionalCategories.flatMap(cat => cat.options.map(opt => ({ ...opt, categoryId: cat.id })));
+        allAdditionalOptions.sort((a, b) => b.code.length - a.code.length);
+        
+        let codeRemainder = value;
+        while (codeRemainder.length > 0) {
+            let matchFound = false;
+            for (const option of allAdditionalOptions) {
+                if (!newSelections[option.categoryId] && codeRemainder.startsWith(option.code)) {
+                    newSelections[option.categoryId] = option.code;
+                    codeRemainder = codeRemainder.substring(option.code.length);
+                    matchFound = true;
+                    break;
+                }
+            }
+            if (!matchFound) break;
+        }
+        handleSelectionsChange(newSelections);
+    };
     
     const handleReset = () => {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
@@ -92,6 +185,8 @@ const App: React.FC = () => {
         setSelections({});
         setTag('');
         setCustomRange({ low: '', high: '' });
+        setRequiredCode('');
+        setAdditionalCode('');
     };
 
     return (
@@ -125,7 +220,38 @@ const App: React.FC = () => {
                 <div className="lg:grid lg:grid-cols-12 lg:gap-8">
                     <div className="lg:col-span-8">
                          <div className="bg-white p-6 rounded-lg shadow-lg mb-6">
-                            <h2 className="text-lg font-semibold text-gray-800 border-b pb-3 mb-4">1. Select Product Model</h2>
+                            <h2 className="text-lg font-semibold text-gray-800 border-b pb-3 mb-4">1. Quick Configuration (Optional)</h2>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="required-code-input" className="block text-sm font-medium text-gray-700 mb-1">Required Options Code</label>
+                                    <input
+                                        id="required-code-input"
+                                        type="text"
+                                        value={requiredCode}
+                                        onChange={(e) => handleRequiredCodeChange(e.target.value.toUpperCase())}
+                                        placeholder="e.g., AEDA730HY2B-"
+                                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm font-mono focus:ring-blue-500 focus:border-blue-500"
+                                        aria-label="Required Options Code Input"
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="additional-code-input" className="block text-sm font-medium text-gray-700 mb-1">Additional Options Code</label>
+                                    <input
+                                        id="additional-code-input"
+                                        type="text"
+                                        value={additionalCode}
+                                        onChange={(e) => handleAdditionalCodeChange(e.target.value.toUpperCase())}
+                                        placeholder="e.g., BNE3WNOACFX5VNX"
+                                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm font-mono focus:ring-blue-500 focus:border-blue-500"
+                                        aria-label="Additional Options Code Input"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">Paste the model code strings to automatically select the options below.</p>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-lg shadow-lg mb-6">
+                            <h2 className="text-lg font-semibold text-gray-800 border-b pb-3 mb-4">2. Select Product Model</h2>
                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {productModels.map((model: ProductModel) => (
                                     <button
@@ -142,6 +268,7 @@ const App: React.FC = () => {
                                 ))}
                             </div>
                         </div>
+
                         <div className="lg:grid lg:grid-cols-5 lg:gap-8">
                             <div className="lg:col-span-2 mb-8 lg:mb-0">
                                 <div className="bg-white p-4 rounded-lg shadow-lg sticky top-28">
