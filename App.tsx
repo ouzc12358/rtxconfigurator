@@ -169,7 +169,7 @@ const App: React.FC = () => {
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
                         <div className="flex items-center">
-                            <img src="https://www.bakerhughes.com/themes/custom/bh/logo.svg" alt="Druck Logo" className="h-8 w-auto mr-4"/>
+                            <img src="https://www.bakerhughes.com/sites/bakerhughes/files/2021-10/druck_no_tagline_web.jpg" alt="Druck Logo" className="h-8 w-auto mr-4"/>
                             <h1 className="text-xl md:text-2xl font-bold text-gray-700">
                                 RTX2000 Series Configurator
                             </h1>
