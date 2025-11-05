@@ -1,5 +1,5 @@
 
-import type { ProductModel, SelectionValidationResult, Selections, SelectionCategory, Option, TFunction } from '../types';
+import type { ProductModel, SelectionValidationResult, Selections, SelectionCategory, Option, TFunction, PerformanceSpecs } from '../types';
 
 // Validation Functions
 const validateElectricalConnector = (optionCode: string, selections: Selections, t: TFunction): SelectionValidationResult => {
@@ -691,16 +691,17 @@ export const getAccuracyFunction = (modelId: string, rangeCode: string): Accurac
     return accuracyFunctions[modelId]?.[rangeCode] ?? null;
 };
 
-export const calculatePerformanceSpecs = (model: ProductModel, selections: Selections, ratio: number | null, t: TFunction) => {
+export const calculatePerformanceSpecs = (model: ProductModel, selections: Selections, ratio: number | null, t: TFunction): PerformanceSpecs => {
     const r = ratio ?? 1; // Default to 1:1 if no ratio provided
-    const specs: { [key: string]: { name: string, value: string } } = {};
+    const specs: PerformanceSpecs = {};
 
     // Accuracy
     const accFunc = getAccuracyFunction(model.id, selections.pressureRange || '')?.func;
     const accuracyValue = accFunc ? accFunc(r) : null;
     specs.accuracy = {
         name: t('spec_accuracy'),
-        value: accuracyValue !== null ? `±${accuracyValue.toFixed(4)} % FS` : t('spec_notApplicable')
+        value: accuracyValue !== null ? `±${accuracyValue.toFixed(4)} % FS` : t('spec_notApplicable'),
+        accuracyValue: accuracyValue
     };
 
     // Long Term Stability

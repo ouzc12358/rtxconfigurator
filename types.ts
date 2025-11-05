@@ -9,3 +9,17 @@ export interface SelectionCategory { id: string; title: string; options: Option[
 export interface ProductModel { id: string; name: string; baseCode: string; description: string; configuration: SelectionCategory[]; t?: TFunction; }
 export type Selections = { [categoryId: string]: string | undefined; };
 export interface ImageInfo { src: string; alt: string; title: string; }
+
+// --- Performance Calculation Types ---
+export interface PerformanceSpec { 
+    name: string; 
+    value: string; 
+    accuracyValue?: number | null; // Keep raw numeric value for charting
+}
+export interface PerformanceSpecs { [key: string]: PerformanceSpec; }
+export interface PerformanceResult {
+    specs: PerformanceSpecs;
+    ratio: number | null;
+    userRange: { low: string; high: string; };
+    rangeOption: Option | undefined;
+}

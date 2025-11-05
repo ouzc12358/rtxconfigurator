@@ -1,7 +1,9 @@
-
 import React, { useMemo, useState } from 'react';
-import type { ProductModel, Selections, Option } from '../types';
-import type { uiTranslations } from '../data/translations';
+// FIX: Import PerformanceSpec to use for type casting.
+import type { ProductModel, Selections, Option, PerformanceResult, PerformanceSpec } from '../types';
+import { uiTranslations } from '../data/translations';
+import { getTranslatedProductData } from '../data/i18n';
+import { calculatePerformanceSpecs } from '../data/productData';
 
 interface SummaryProps {
     model: ProductModel;
@@ -13,6 +15,7 @@ interface SummaryProps {
     specialRequest: string;
     onSpecialRequestChange: (request: string) => void;
     onCalculatePerformance: () => void;
+    performanceResult: PerformanceResult | null;
     t: (key: keyof typeof uiTranslations.en) => string;
 }
 
@@ -78,7 +81,7 @@ const generateManifoldModelNumber = (model: ProductModel, selections: Selections
 };
 
 
-export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagChange, customRange, onCustomRangeChange, specialRequest, onSpecialRequestChange, onCalculatePerformance, t }) => {
+export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagChange, customRange, onCustomRangeChange, specialRequest, onSpecialRequestChange, onCalculatePerformance, performanceResult, t }) => {
     const [isCopied, setIsCopied] = useState(false);
     
     const { 
@@ -203,6 +206,12 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
             } : 'N/A',
             specialRequest: specialRequest || 'N/A',
             selectedOptions: selectedOptionsList,
+            performanceReport: performanceResult ? {
+                calibrationRange: `${performanceResult.userRange.low} to ${performanceResult.userRange.high} ${performanceResult.rangeOption?.unit}`,
+                turndownRatio: performanceResult.ratio ? `${performanceResult.ratio.toFixed(2)}:1` : 'N/A',
+                // FIX: Cast Object.values result to PerformanceSpec[] to ensure type safety, resolving 'unknown' type errors on properties.
+                specifications: (Object.values(performanceResult.specs) as PerformanceSpec[]).map(s => ({ [s.name]: s.value }))
+            } : 'N/A'
         };
 
         const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -219,104 +228,154 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
         URL.revokeObjectURL(url);
     };
 
-    const handleExportToPdf = () => {
+    const handleExportToPdf = async () => {
         // @ts-ignore - jspdf is loaded from CDN
         const { jsPDF } = window.jspdf;
         if (!jsPDF) {
             alert(t('alert_pdfLibraryNotLoaded'));
             return;
         }
-
+    
         const doc = new jsPDF();
+    
+        // --- English-only setup ---
+        const t_en = (key: keyof typeof uiTranslations.en) => uiTranslations.en[key];
+        const enProductModels = getTranslatedProductData('en');
+        const enModel = enProductModels.find(m => m.id === model.id);
+    
+        if (!enModel) {
+            alert("Could not find English product data for PDF export.");
+            return;
+        }
+    
+        const enSelectedOptionsList = enModel.configuration
+            .map(category => {
+                const selectedCode = selections[category.id];
+                if (!selectedCode) return null;
+                const option = category.options.find(o => o.code === selectedCode);
+                return option ? { category: category.title, code: option.code, description: option.description } : null;
+            })
+            .filter((item): item is { category: string; code: string; description: string; } => item !== null);
         
+        const enRangeOption = enModel.configuration.find(c => c.id === 'pressureRange')?.options.find(o => o.code === selections.pressureRange);
+        
+        const [enLine1, enLine2, enLine3, enLine4] = generateTransmitterModelNumber(enModel, selections, customRange, enRangeOption, isCustomRangeValidAndSet, specialRequest, t_en);
+        const enManifoldNumber = generateManifoldModelNumber(enModel, selections);
+    
+        // --- PDF Generation Logic ---
         const logoUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAoALADASIAAhEBAxEB/8QAGwABAQACAwEAAAAAAAAAAAAAAAYDBwECBAX/xAAwEAABAwIEBAQEBwAAAAAAAAABAgMEBREABgcSITFBUQgTImEVFjJCcYGRobHB0f/EABkBAQADAQEAAAAAAAAAAAAAAAABAgMEBf/EACERAQABAwQCAwAAAAAAAAAAAAABAgMREiExQVEEE2Fx/9oADAMBAAIRAxEAPwD2OMYxgDGxjAGNjGAMbGMAdsY1gCMeR+IuPXuGOHhWKbSmas+uUzFS047ykhSybk2O4A7bn5GuA/8AmHU//paB+oO//wCq7I4+rz+TTDjX1/f9I8sH+M+qS8x2n9PUMY8s/8AmLU+3wNA/UHf/wCvQ8l+L2Vcf5LDo0rKcjoFHYfUtEhurLhWpNrpsmOu1tx33rbFwc+c1w5V9Ixx15cK+p6ljYxjmXMbGMAdsYxgDGxjAGNjGAMbGMAdsYxgB2xjGAIuYV+lZVSZNWrc5iDBjJK3XnlBKUgC5O5/meK+KPirmnH2tU3hHglUhNPmvoZflNBQVLJJFrj+VgG6jvfbYAm1x/GHj/VeP+IVcN8IVKSjK2nCy9JiqKVTiDZZCiPyN9AbWURe9gBXrHg/wCAuV8D5bHq9Xis1bOKg2FvzXkBfklQBCGiRZI33FlG5uQLC1mZ1T5fU/0/k9XwS4VpfCXDlLynT2h4UdoKccP+o+s3W4fmpRJ+gAFgK38YxzltsbGMAbGMAbGMAY2MYA//2Q==';
+    
+        doc.addFont('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/fonts/Roboto/Roboto-Regular.ttf', 'Roboto', 'normal');
+        doc.setFont('Roboto');
 
-        const addContent = (imgData: string) => {
-            doc.addFont('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/fonts/Roboto/Roboto-Regular.ttf', 'Roboto', 'normal');
-            doc.setFont('Roboto');
+        doc.addImage(logoUrl, 'JPEG', 15, 10, 50, 10);
+        doc.setFontSize(18);
+        doc.setFont(undefined, 'bold');
+        doc.text(t_en('pdf_reportTitle'), 105, 20, { align: 'center' });
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.text(`${t_en('pdf_date')}: ${new Date().toLocaleDateString()}`, 195, 28, { align: 'right' });
 
-            doc.addImage(imgData, 'JPEG', 15, 10, 50, 10); // x, y, w, h
+        let y = 40;
+        const lineSpacing = 6;
+        const sectionSpacing = 10;
+        const pageMargin = 15;
+        const contentWidth = doc.internal.pageSize.getWidth() - (pageMargin * 2);
+        const keyX = pageMargin;
+        const valueX = 75;
 
-            doc.setFontSize(18);
+        const checkPageBreak = () => {
+            if (y > 280) {
+                doc.addPage();
+                y = 20;
+            }
+        };
+        
+        const addSectionHeader = (text: string) => {
+            checkPageBreak();
+            doc.setFontSize(12);
             doc.setFont(undefined, 'bold');
-            doc.text(t('pdf_reportTitle'), 105, 20, { align: 'center' });
-
-            doc.setFontSize(10);
-            doc.setFont(undefined, 'normal');
-            doc.text(`${t('pdf_date')}: ${new Date().toLocaleDateString()}`, 195, 28, { align: 'right' });
-
-            let y = 40;
-            const lineSpacing = 6;
-            const sectionSpacing = 10;
-            const pageMargin = 15;
-            const contentWidth = doc.internal.pageSize.getWidth() - (pageMargin * 2);
-            const keyX = pageMargin;
-            const valueX = 75;
-
-            const checkPageBreak = () => {
-                if (y > 280) {
-                    doc.addPage();
-                    y = 20;
-                }
-            };
-            
-            const addSectionHeader = (text: string) => {
-                checkPageBreak();
-                doc.setFontSize(12);
-                doc.setFont(undefined, 'bold');
-                doc.text(text, keyX, y);
-                y += lineSpacing + 2;
-            };
-
-            const addKeyValue = (key: string, value: string) => {
-                checkPageBreak();
-                doc.setFontSize(10);
-                doc.setFont(undefined, 'bold');
-                doc.text(key, keyX, y);
-                doc.setFont(undefined, 'normal');
-                const splitValue = doc.splitTextToSize(value, contentWidth - (valueX - keyX));
-                doc.text(splitValue, valueX, y);
-                y += splitValue.length * 5; // Adjust y based on number of lines
-                y += 2; // Extra padding
-            };
-            
-            addSectionHeader(t('summaryTitle'));
-            addKeyValue(`${t('pdf_model')}:`, model.name);
-            if (tag) addKeyValue(`${t('pdf_tagNumber')}:`, tag);
-            y += sectionSpacing / 2;
-            
-            addSectionHeader(t('pdf_transmitterTitle'));
-            addKeyValue(`${t('pdf_line1')}:`, transmitterModelLines[0]);
-            addKeyValue(`${t('pdf_line2')}:`, transmitterModelLines[1]);
-            addKeyValue(`${t('pdf_line3')} (${isCustomRangeValidAndSet ? t('calibratedRange') : t('selectedRange')}):`, transmitterModelLines[2]);
-            if (specialRequest) addKeyValue(`${t('pdf_line4')} (${t('specialRequestsLabel')}):`, specialRequest);
-            y += sectionSpacing / 2;
-
-            if (manifoldModelNumber) {
-                addSectionHeader(t('pdf_manifoldTitle'));
-                addKeyValue(t('pdf_fullCode'), manifoldModelNumber);
-                y += sectionSpacing / 2;
-            }
-            
-            addSectionHeader(t('pdf_configDetailsTitle'));
-            selectedOptionsList.forEach(item => {
-                addKeyValue(`${item.category}:`, `${item.description} (${item.code})`);
-            });
-
-            if (isCustomRangeValidAndSet) {
-                 addKeyValue(`${t('customRangeLabel')}:`, `${customRange.low} to ${customRange.high} ${selectedRangeOption?.unit}`);
-            }
-
-            const date = new Date().toISOString().split('T')[0];
-            doc.save(`${model.name.replace(/\s/g, '_')}_Configuration_${date}.pdf`);
+            doc.text(text, keyX, y);
+            y += lineSpacing + 2;
         };
 
-        try {
-            addContent(logoUrl);
-        } catch (error) {
-            console.error("Failed to generate PDF:", error);
-            alert(t('alert_pdfGenerationError'));
+        const addKeyValue = (key: string, value: string) => {
+            if (!value) return;
+            checkPageBreak();
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'bold');
+            doc.text(key, keyX, y);
+            doc.setFont(undefined, 'normal');
+            const splitValue = doc.splitTextToSize(value, contentWidth - (valueX - keyX));
+            doc.text(splitValue, valueX, y);
+            y += splitValue.length * 5 + 2;
+        };
+        
+        addSectionHeader(t_en('summaryTitle'));
+        addKeyValue(`${t_en('pdf_model')}:`, enModel.name);
+        if (tag) addKeyValue(`${t_en('pdf_tagNumber')}:`, tag);
+        y += sectionSpacing / 2;
+        
+        addSectionHeader(t_en('pdf_transmitterTitle'));
+        addKeyValue(`${t_en('pdf_line1')}:`, enLine1);
+        addKeyValue(`${t_en('pdf_line2')}:`, enLine2);
+        addKeyValue(`${t_en('pdf_line3')} (${isCustomRangeValidAndSet ? t_en('calibratedRange') : t_en('selectedRange')}):`, enLine3);
+        if (specialRequest) addKeyValue(`${t_en('pdf_line4')} (${t_en('specialRequestsLabel')}):`, specialRequest);
+        y += sectionSpacing / 2;
+
+        if (enManifoldNumber) {
+            addSectionHeader(t_en('pdf_manifoldTitle'));
+            addKeyValue(t_en('pdf_fullCode'), enManifoldNumber);
+            y += sectionSpacing / 2;
         }
+        
+        addSectionHeader(t_en('pdf_configDetailsTitle'));
+        enSelectedOptionsList.forEach(item => {
+            addKeyValue(`${item.category}:`, `${item.description} (${item.code})`);
+        });
+
+        if (isCustomRangeValidAndSet) {
+             addKeyValue(`${t_en('customRangeLabel')}:`, `${customRange.low} to ${customRange.high} ${enRangeOption?.unit}`);
+        }
+
+        // --- Add Performance Report Section (always in English) ---
+        if (performanceResult) {
+            y += sectionSpacing;
+            checkPageBreak();
+            
+            // Force a new page for the performance report for better layout
+            doc.addPage();
+            y = 20;
+            
+            addSectionHeader(t_en('performanceReportTitle'));
+            const { ratio, userRange } = performanceResult;
+
+            // Recalculate specs in English for the PDF to ensure correct labels
+            const enPerformanceSpecs = calculatePerformanceSpecs(enModel, selections, ratio, t_en);
+
+            const enPerfRangeOption = enModel.configuration.find(c => c.id === 'pressureRange')?.options.find(o => o.code === selections.pressureRange);
+
+            addKeyValue(t_en('enterCalibrationRange'), `${userRange.low} to ${userRange.high} ${enPerfRangeOption?.unit || ''}`);
+            if (ratio) addKeyValue(t_en('turndownRatio'), `${ratio.toFixed(2)}:1`);
+            
+            y += sectionSpacing / 2;
+            
+            // Add a header for the specs table
+            doc.setFont(undefined, 'bold');
+            doc.text(t_en('parameter'), keyX, y);
+            doc.text(t_en('performance'), valueX, y);
+            y += lineSpacing;
+            doc.line(keyX, y - 2, contentWidth + keyX, y - 2);
+
+
+            // FIX: Cast Object.values result to PerformanceSpec[] to ensure type safety, resolving potential 'unknown' type errors.
+            (Object.values(enPerformanceSpecs) as PerformanceSpec[]).forEach(spec => {
+                addKeyValue(spec.name, spec.value);
+            });
+        }
+
+        const date = new Date().toISOString().split('T')[0];
+        doc.save(`${model.name.replace(/\s/g, '_')}_Configuration_${date}.pdf`);
     };
 
 

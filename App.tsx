@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Configurator } from './components/Configurator';
 import { Summary } from './components/Summary';
@@ -8,7 +6,7 @@ import { ProductImage } from './components/ProductImage';
 import { productModels as baseProductModels, calculatePerformanceSpecs, getAccuracyFunction } from './data/productData';
 import { getTranslatedProductData } from './data/i18n';
 import { uiTranslations } from './data/translations';
-import type { Selections, ProductModel, ImageInfo, TFunction } from './types';
+import type { Selections, ProductModel, ImageInfo, TFunction, PerformanceResult } from './types';
 
 // Key for localStorage
 const LOCAL_STORAGE_KEY = 'druckRtxConfiguratorState';
@@ -116,7 +114,7 @@ const AccuracyChart: React.FC<AccuracyChartProps> = ({ accuracyFunction, current
     const { points, yMax } = useMemo(() => {
         if (!accuracyFunction) return { points: [], yMax: 0.1 };
         const dataPoints = [];
-        let maxY = 0.04;
+        let maxY = 0.04; // Min y-axis value to handle flat lines
         const step = maxRatio > 1 ? (maxRatio - 1) / 100 : 0;
         for (let i = 0; i <= 100; i++) {
             const r = 1 + i * step;
@@ -126,13 +124,25 @@ const AccuracyChart: React.FC<AccuracyChartProps> = ({ accuracyFunction, current
                 if (acc > maxY) maxY = acc;
             }
         }
+        if (currentAccuracy !== null && currentAccuracy > maxY) {
+            maxY = currentAccuracy;
+        }
         return { points: dataPoints, yMax: Math.max(maxY * 1.2, 0.05) };
-    }, [accuracyFunction, maxRatio]);
+    }, [accuracyFunction, maxRatio, currentAccuracy]);
 
     const xScale = (r: number) => margin.left + ((r - 1) / (maxRatio > 1 ? maxRatio - 1 : 1)) * innerWidth;
     const yScale = (acc: number) => margin.top + innerHeight - (acc / yMax) * innerHeight;
 
     const pathData = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(p.r)} ${yScale(p.acc)}`).join(' ');
+
+    const xTicks = useMemo(() => {
+        const ticks = new Set([1]);
+        const quarters = [0.25, 0.5, 0.75, 1];
+        quarters.forEach(q => {
+            ticks.add(Math.round(1 + q * (maxRatio-1)));
+        });
+        return Array.from(ticks).sort((a,b) => a-b);
+    }, [maxRatio]);
 
     return (
         <svg width={width} height={height} className="max-w-full">
@@ -151,9 +161,9 @@ const AccuracyChart: React.FC<AccuracyChartProps> = ({ accuracyFunction, current
             {/* X Axis */}
             <g className="text-xs text-gray-500">
                 <line x1={margin.left} y1={margin.top + innerHeight} x2={margin.left + innerWidth} y2={margin.top + innerHeight} stroke="currentColor" />
-                {[1, ...[0.25, 0.5, 0.75, 1].map(t => 1 + t * (maxRatio-1))].map(tick => (
+                {xTicks.map(tick => (
                      <g key={tick}>
-                        <text x={xScale(tick)} y={margin.top + innerHeight + 15} textAnchor="middle">{Math.round(tick)}:1</text>
+                        <text x={xScale(tick)} y={margin.top + innerHeight + 15} textAnchor="middle">{tick}:1</text>
                      </g>
                 ))}
                  <text x={margin.left + innerWidth/2} y={margin.top + innerHeight + 35} textAnchor="middle" className="font-semibold fill-current">{t('turndownRatio')}</text>
@@ -168,7 +178,14 @@ const AccuracyChart: React.FC<AccuracyChartProps> = ({ accuracyFunction, current
                     <circle cx={xScale(currentRatio)} cy={yScale(currentAccuracy)} r="5" fill="#ef4444" />
                     <line x1={xScale(currentRatio)} x2={xScale(currentRatio)} y1={yScale(currentAccuracy)} y2={margin.top + innerHeight} stroke="#ef4444" strokeDasharray="4 2" />
                     <line x1={margin.left} x2={xScale(currentRatio)} y1={yScale(currentAccuracy)} y2={yScale(currentAccuracy)} stroke="#ef4444" strokeDasharray="4 2" />
-                    <text x={xScale(currentRatio) + 5} y={yScale(currentAccuracy) - 5} className="text-xs font-bold fill-red-600">{`r=${currentRatio.toFixed(1)}, acc=${currentAccuracy.toFixed(4)}%`}</text>
+                    <text 
+                        x={xScale(currentRatio) + (xScale(currentRatio) > innerWidth - 70 ? -8 : 8)} 
+                        y={yScale(currentAccuracy) - 8} 
+                        className="text-xs font-bold fill-red-600"
+                        textAnchor={xScale(currentRatio) > innerWidth - 70 ? "end" : "start"}
+                    >
+                        {`${currentAccuracy.toFixed(4)}%`}
+                    </text>
                 </g>
             )}
         </svg>
@@ -180,10 +197,11 @@ interface PerformanceCalculatorProps {
     model: ProductModel;
     selections: Selections;
     onClose: () => void;
+    onCalculationUpdate: (result: PerformanceResult | null) => void;
     t: TFunction;
 }
 
-const PerformanceCalculator: React.FC<PerformanceCalculatorProps> = ({ model, selections, onClose, t }) => {
+const PerformanceCalculator: React.FC<PerformanceCalculatorProps> = ({ model, selections, onClose, onCalculationUpdate, t }) => {
     const [userRange, setUserRange] = useState({ low: '', high: '' });
     
     useEffect(() => {
@@ -198,7 +216,7 @@ const PerformanceCalculator: React.FC<PerformanceCalculatorProps> = ({ model, se
         };
     }, [onClose]);
 
-    const { specs, ratio, rangeOption, error } = useMemo(() => {
+    const calculationResult = useMemo(() => {
         const rangeCat = model.configuration.find(c => c.id === 'pressureRange');
         const rangeOpt = rangeCat?.options.find(o => o.code === selections.pressureRange);
         if (!rangeOpt) {
@@ -235,9 +253,21 @@ const PerformanceCalculator: React.FC<PerformanceCalculatorProps> = ({ model, se
         if (r > maxR) {
             return { specs: null, ratio: r, rangeOption: rangeOpt, error: t('turndownRatioError').replace('{maxRatio}', maxR.toFixed(0)) };
         }
+        
+        const specs = calculatePerformanceSpecs(model, selections, r, t);
 
-        return { specs: calculatePerformanceSpecs(model, selections, r, t), ratio: r, rangeOption: rangeOpt, error: null };
+        return { specs, ratio: r, rangeOption: rangeOpt, error: null };
     }, [model, selections, userRange, t]);
+
+    const { specs, ratio, rangeOption, error } = calculationResult;
+
+     useEffect(() => {
+        if (error) {
+            onCalculationUpdate(null);
+        } else if (specs) {
+            onCalculationUpdate({ specs, ratio, userRange, rangeOption });
+        }
+    }, [specs, ratio, userRange, rangeOption, error, onCalculationUpdate]);
 
     const accuracyFunction = useMemo(() => getAccuracyFunction(model.id, selections.pressureRange || ''), [model.id, selections.pressureRange]);
     
@@ -301,7 +331,7 @@ const PerformanceCalculator: React.FC<PerformanceCalculatorProps> = ({ model, se
                            <AccuracyChart 
                                 accuracyFunction={accuracyFunction?.func ?? null} 
                                 currentRatio={ratio} 
-                                currentAccuracy={specs?.accuracy ? parseFloat(specs.accuracy.value) : null}
+                                currentAccuracy={specs?.accuracy.accuracyValue ?? null}
                                 maxRatio={maxRatio}
                                 t={t}
                            />
@@ -364,6 +394,7 @@ const App: React.FC = () => {
 
     // State for performance calculator modal
     const [isPerformanceVisible, setPerformanceVisible] = useState(false);
+    const [performanceResult, setPerformanceResult] = useState<PerformanceResult | null>(null);
 
     // Translation function and translated data
     const t = (key: keyof typeof uiTranslations.en, ...args: any[]) => {
@@ -420,6 +451,7 @@ const App: React.FC = () => {
         setTag('');
         setSpecialRequest('');
         setFullModelCode('');
+        setPerformanceResult(null);
     };
 
     const handleSelectionsChange = (newSelections: Selections) => {
@@ -428,6 +460,7 @@ const App: React.FC = () => {
             setCustomRange({ low: '', high: '' });
         }
         setSelections(newSelections);
+        setPerformanceResult(null); // Invalidate performance calc on any selection change
     };
 
     const handleApplyFullCode = () => {
@@ -480,6 +513,7 @@ const App: React.FC = () => {
         setCustomRange({ low: '', high: '' });
         setTag('');
         setSpecialRequest('');
+        setPerformanceResult(null);
 
         // Only remove leading hyphens, as other hyphens can be part of a valid code (e.g., 'A-')
         let codeForOptions = code.substring(prefixLength).replace(/^-+/, '');
@@ -552,6 +586,7 @@ const App: React.FC = () => {
         setCustomRange({ low: '', high: '' });
         setSpecialRequest('');
         setFullModelCode('');
+        setPerformanceResult(null);
     };
     
     const toggleLanguage = () => {
@@ -681,6 +716,7 @@ const App: React.FC = () => {
                                     specialRequest={specialRequest}
                                     onSpecialRequestChange={setSpecialRequest}
                                     onCalculatePerformance={() => setPerformanceVisible(true)}
+                                    performanceResult={performanceResult}
                                     t={t}
                                 />
                            </div>
@@ -697,6 +733,7 @@ const App: React.FC = () => {
                     model={selectedModel}
                     selections={selections}
                     onClose={() => setPerformanceVisible(false)}
+                    onCalculationUpdate={setPerformanceResult}
                     t={t}
                 />
             )}
