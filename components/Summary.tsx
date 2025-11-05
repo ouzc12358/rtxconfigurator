@@ -12,6 +12,7 @@ interface SummaryProps {
     onCustomRangeChange: (range: { low: string; high: string }) => void;
     specialRequest: string;
     onSpecialRequestChange: (request: string) => void;
+    onCalculatePerformance: () => void;
     t: (key: keyof typeof uiTranslations.en) => string;
 }
 
@@ -77,7 +78,7 @@ const generateManifoldModelNumber = (model: ProductModel, selections: Selections
 };
 
 
-export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagChange, customRange, onCustomRangeChange, specialRequest, onSpecialRequestChange, t }) => {
+export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagChange, customRange, onCustomRangeChange, specialRequest, onSpecialRequestChange, onCalculatePerformance, t }) => {
     const [isCopied, setIsCopied] = useState(false);
     
     const { 
@@ -228,7 +229,7 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
 
         const doc = new jsPDF();
         
-        const logoUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAoALADASIAAhEBAxEB/8QAGwABAQACAwEAAAAAAAAAAAAAAAYDBwECBAX/xAAwEAABAwIEBAQEBwAAAAAAAAABAgMEBREABgcSITFBUQgTImEVFjJCcYGRobHB0f/EABkBAQADAQEAAAAAAAAAAAAAAAABAgMEBf/EACERAQABAwQCAwAAAAAAAAAAAAABAgMREiExQVEEE2Fx/9oADAMBAAIRAxEAPwD2OMYxgDGxjAGNjGAMbGMAdsY1gCMeR+IuPXuGOHhWKbSmas+uUzFS047ykhSybk2O4A7bn5GuA/8AmHU//paB+oO//wCq7I4+rz+TTDjX1/f9I8sH+M+qS8x2n9PUMY8s/8AmLU+3wNA/UHf/wDU8l+L2Vcf5LDo0rKcjoFHYfUtEhurLhWpNrpsmOu1tx33rbFwc+c1w5V9Ixx15cK+p6ljYxjmXMbGMAdsYxgDGxjAGNjGAPk3xF8RarwHxTQMuYy6NVWZ8NEpTjj6mykrdcbta3+E3+Zrwz/n/AFb/AOhKf9Qc/wDlT3bPsgyvPqezT84y+lV2M0suttzGEuhCiCAoBQIBAJG3cjvXE/wDD/hD/AOyWRfp7f8V3Y/F4kY8VWPP6vLycLO5zGpHj3/P6rf/oSj/UHP8A5U2/DPjzVOPk1iROy6NSY9MW0hKmX1OFZWFK3uBtnb4mvQv+H/AAh/9ksj/T2/4rocl5JlWSsPsZNl1IojL5CnG4MVDAVa9iQlIBIvtfY1lmcXh+HNVXy+i+Hgzp5zVH1xjYxjyHoY2MYA7YxjAGNjGAMbGMAdsYxgB2xjGAIuYV+lZVSZNWrc5iDBjJK3XnlBKUgC5O5/meK+KPirmnH2tU3hHglUhNPmvoZflNBQVLJJFrj+VgG6jvfbYAm1x/GHj/VeP+IVcN8IVKSjK2nCy9JiqKVTiDZZCiPyN9AbWURe9gBXrHg/wCAuV8D5bHq9Xis1bOKg2FvzXkBfklQBCGiRZI33FlG5uQLC1mZ1T5fU/0/k9XwS4VpfCXDlLynT2h4UdoKccP+o+s3W4fmpRJ+gAFgK38YxzltsbGMAbGMAbGMAY2MYA//2Q==';
+        const logoUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAoALADASIAAhEBAxEB/8QAGwABAQACAwEAAAAAAAAAAAAAAAYDBwECBAX/xAAwEAABAwIEBAQEBwAAAAAAAAABAgMEBREABgcSITFBUQgTImEVFjJCcYGRobHB0f/EABkBAQADAQEAAAAAAAAAAAAAAAABAgMEBf/EACERAQABAwQCAwAAAAAAAAAAAAABAgMREiExQVEEE2Fx/9oADAMBAAIRAxEAPwD2OMYxgDGxjAGNjGAMbGMAdsY1gCMeR+IuPXuGOHhWKbSmas+uUzFS047ykhSybk2O4A7bn5GuA/8AmHU//paB+oO//wCq7I4+rz+TTDjX1/f9I8sH+M+qS8x2n9PUMY8s/8AmLU+3wNA/UHf/wCvQ8l+L2Vcf5LDo0rKcjoFHYfUtEhurLhWpNrpsmOu1tx33rbFwc+c1w5V9Ixx15cK+p6ljYxjmXMbGMAdsYxgDGxjAGNjGAMbGMAdsYxgB2xjGAIuYV+lZVSZNWrc5iDBjJK3XnlBKUgC5O5/meK+KPirmnH2tU3hHglUhNPmvoZflNBQVLJJFrj+VgG6jvfbYAm1x/GHj/VeP+IVcN8IVKSjK2nCy9JiqKVTiDZZCiPyN9AbWURe9gBXrHg/wCAuV8D5bHq9Xis1bOKg2FvzXkBfklQBCGiRZI33FlG5uQLC1mZ1T5fU/0/k9XwS4VpfCXDlLynT2h4UdoKccP+o+s3W4fmpRJ+gAFgK38YxzltsbGMAbGMAbGMAY2MYA//2Q==';
 
         const addContent = (imgData: string) => {
             doc.addFont('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/fonts/Roboto/Roboto-Regular.ttf', 'Roboto', 'normal');
@@ -430,7 +431,7 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
                     {t('exportJson')}
                 </button>
             </div>
-             <div className="mt-3">
+             <div className="mt-3 grid grid-cols-1 gap-3">
                  <button
                     onClick={handleExportToPdf}
                     className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
@@ -441,6 +442,17 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
                         <path d="M6 8v9h2V8H6zm4 0v9h2V8h-2zm4 0v9h2V8h-2zM6 4h8v2H6V4z"/>
                     </svg>
                     {t('exportPdf')}
+                </button>
+                 <button
+                    onClick={onCalculatePerformance}
+                    disabled={!selections.pressureRange}
+                    className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
+                    aria-label={t('calculatePerformanceAriaLabel')}
+                >
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    {t('calculatePerformance')}
                 </button>
             </div>
         </div>

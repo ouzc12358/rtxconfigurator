@@ -365,10 +365,10 @@ export const productModels: ProductModel[] = [
             {
                 id: 'pressureRange', title: 'Pressure Range', part: 'required',
                 options: [
-                    { code: 'A2', description: '0 to 40 kPa', min: 0, max: 40, unit: 'kPa' },
-                    { code: 'A5', description: '0 to 200 kPa', min: 0, max: 200, unit: 'kPa' },
-                    { code: 'A7', description: '0 to 1 MPa', min: 0, max: 1, unit: 'MPa' },
-                    { code: 'A9', description: '0 to 5 MPa', min: 0, max: 5, unit: 'MPa' },
+                    { code: 'A2', description: '0 to 40 kPa', min: 0, max: 40, unit: 'kPa', minSpan: 10 },
+                    { code: 'A5', description: '0 to 200 kPa', min: 0, max: 200, unit: 'kPa', minSpan: 10 },
+                    { code: 'A7', description: '0 to 1 MPa', min: 0, max: 1, unit: 'MPa', minSpan: 0.01 },
+                    { code: 'A9', description: '0 to 5 MPa', min: 0, max: 5, unit: 'MPa', minSpan: 0.05 },
                 ]
             },
             {
@@ -443,12 +443,13 @@ export const productModels: ProductModel[] = [
             {
                 id: 'pressureRange', title: 'Pressure Range', part: 'required',
                 options: [
-                    { code: 'G4', description: '-100 to 200 kPa', min: -100, max: 200, unit: 'kPa' },
-                    { code: 'G5', description: '-0.1 to 1 MPa', min: -0.1, max: 1, unit: 'MPa' },
-                    { code: 'G6', description: '-0.1 to 5 MPa', min: -0.1, max: 5, unit: 'MPa' },
-                    { code: 'G7', description: '-0.1 to 20 MPa', min: -0.1, max: 20, unit: 'MPa' },
-                    { code: 'G8', description: '-0.1 to 40 MPa', min: -0.1, max: 40, unit: 'MPa' },
-                    { code: 'G9', description: '-0.1 to 70 MPa', min: -0.1, max: 70, unit: 'MPa' },
+                    { code: 'G2', description: '-40 to 40 kPa', min: -40, max: 40, unit: 'kPa', minSpan: 0.8 },
+                    { code: 'G4', description: '-100 to 200 kPa', min: -100, max: 200, unit: 'kPa', minSpan: 1 },
+                    { code: 'G5', description: '-0.1 to 1 MPa', min: -0.1, max: 1, unit: 'MPa', minSpan: 0.01 },
+                    { code: 'G6', description: '-0.1 to 5 MPa', min: -0.1, max: 5, unit: 'MPa', minSpan: 0.05 },
+                    { code: 'G7', description: '-0.1 to 20 MPa', min: -0.1, max: 20, unit: 'MPa', minSpan: 0.2 },
+                    { code: 'G8', description: '-0.1 to 40 MPa', min: -0.1, max: 40, unit: 'MPa', minSpan: 0.4 },
+                    { code: 'G9', description: '-0.1 to 70 MPa', min: -0.1, max: 70, unit: 'MPa', minSpan: 0.7 },
                 ]
             },
             {
@@ -522,10 +523,10 @@ export const productModels: ProductModel[] = [
             {
                 id: 'pressureRange', title: 'Pressure Range', part: 'required',
                 options: [
-                    { code: 'G2', description: '-40 to 40 kPa', min: -40, max: 40, unit: 'kPa' },
-                    { code: 'G4', description: '-100 to 200 kPa', min: -100, max: 200, unit: 'kPa' },
-                    { code: 'G5', description: '-0.1 to 1 MPa', min: -0.1, max: 1, unit: 'MPa' },
-                    { code: 'G6', description: '-0.1 to 5 MPa', min: -0.1, max: 5, unit: 'MPa' },
+                    { code: 'G2', description: '-40 to 40 kPa', min: -40, max: 40, unit: 'kPa', minSpan: 0.8 },
+                    { code: 'G4', description: '-100 to 200 kPa', min: -100, max: 200, unit: 'kPa', minSpan: 1 },
+                    { code: 'G5', description: '-0.1 to 1 MPa', min: -0.1, max: 1, unit: 'MPa', minSpan: 0.01 },
+                    { code: 'G6', description: '-0.1 to 5 MPa', min: -0.1, max: 5, unit: 'MPa', minSpan: 0.05 },
                 ]
             },
             {
@@ -590,13 +591,13 @@ export const productModels: ProductModel[] = [
             {
                 id: 'pressureRange', title: 'Pressure Range', part: 'required',
                 options: [
-                    { code: 'B0', description: '-2 to 2 kPa (No center diaphragm)', min: -2, max: 2, unit: 'kPa' },
-                    { code: 'D0', description: '-2 to 2 kPa', min: -2, max: 2, unit: 'kPa' },
-                    { code: 'D1', description: '-10 to 10 kPa', min: -10, max: 10, unit: 'kPa' },
-                    { code: 'D3', description: '-100 to 100 kPa', min: -100, max: 100, unit: 'kPa' },
-                    { code: 'D5', description: '-0.5 to 1 MPa', min: -500, max: 1000, unit: 'kPa' },
-                    { code: 'D6', description: '-0.5 to 5 MPa', min: -500, max: 5000, unit: 'kPa' },
-                    { code: 'D7', description: '-0.5 to 14 MPa', min: -500, max: 14000, unit: 'kPa' },
+                    { code: 'B0', description: '-2 to 2 kPa (No center diaphragm)', min: -2, max: 2, unit: 'kPa', minSpan: 0.1 },
+                    { code: 'D0', description: '-2 to 2 kPa', min: -2, max: 2, unit: 'kPa', minSpan: 0.1 },
+                    { code: 'D1', description: '-10 to 10 kPa', min: -10, max: 10, unit: 'kPa', minSpan: 0.5 },
+                    { code: 'D3', description: '-100 to 100 kPa', min: -100, max: 100, unit: 'kPa', minSpan: 1 },
+                    { code: 'D5', description: '-0.5 to 1 MPa', min: -0.5, max: 1, unit: 'MPa', minSpan: 0.01 },
+                    { code: 'D6', description: '-0.5 to 5 MPa', min: -0.5, max: 5, unit: 'MPa', minSpan: 0.05 },
+                    { code: 'D7', description: '-0.5 to 14 MPa', min: -0.5, max: 14, unit: 'MPa', minSpan: 0.14 },
                 ]
             },
             {
@@ -616,13 +617,13 @@ export const productModels: ProductModel[] = [
             },
             ...sharedHousingAndExplosionOptions,
             ...sharedAdditionalOptions,
-             {
+            {
                  id: 'weldNeck', title: 'Weld Neck Connector', part: 'additional',
                  options: [{ code: 'WN', description: 'None' }],
                  validate: validateWeldNeck_KD,
             },
             ...sharedAdditionalOptions2,
-             {
+            {
                 id: 'manifold', title: 'Valve Manifold Assembly', part: 'additional',
                 options: [
                     { code: 'V3', description: '3-valve manifold, not assembled' },
@@ -644,3 +645,115 @@ export const productModels: ProductModel[] = [
         ]
     }
 ];
+
+// -- Performance Calculation Data and Functions --
+
+type AccuracyFunction = (r: number) => number | null;
+interface AccuracyInfo {
+    func: AccuracyFunction;
+    maxRatio: number;
+}
+
+const accuracyFunctions: { [modelId: string]: { [rangeCode: string]: AccuracyInfo } } = {
+    'RTX2300A': {
+        'A2': { func: (r) => r <= 4 ? 0.04 : null, maxRatio: 4 },
+        'A5': { func: (r) => r <= 10 ? 0.04 : (r < 20 ? 0.004 + 0.0036 * r : null), maxRatio: 20 },
+        'A7': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+        'A9': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+    },
+    'RTX2400G': {
+        'G2': { func: (r) => r <= 5 ? 0.04 : (r < 50 ? 0.004 + 0.0072 * r : null), maxRatio: 50 },
+        'G4': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+        'G5': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+        'G6': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+        'G7': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+        'G8': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+        'G9': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+    },
+    'RTX2400K': { // Same as RTX2400G
+        'G2': { func: (r) => r <= 5 ? 0.04 : (r < 50 ? 0.004 + 0.0072 * r : null), maxRatio: 50 },
+        'G4': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+        'G5': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+        'G6': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+    },
+    'RTX2500D': {
+        'B0': { func: (r) => r <= 20 ? 0.05 + 0.015 * r : null, maxRatio: 20 },
+        'D0': { func: (r) => r <= 20 ? 0.05 + 0.015 * r : null, maxRatio: 20 },
+        'D1': { func: (r) => r <= 20 ? 0.013 + 0.027 * r : null, maxRatio: 20 },
+        'D3': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+        'D5': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+        'D6': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+        'D7': { func: (r) => r <= 10 ? 0.04 : (r < 100 ? 0.004 + 0.0036 * r : null), maxRatio: 100 },
+    }
+};
+
+export const getAccuracyFunction = (modelId: string, rangeCode: string): AccuracyInfo | null => {
+    return accuracyFunctions[modelId]?.[rangeCode] ?? null;
+};
+
+export const calculatePerformanceSpecs = (model: ProductModel, selections: Selections, ratio: number | null, t: TFunction) => {
+    const r = ratio ?? 1; // Default to 1:1 if no ratio provided
+    const specs: { [key: string]: { name: string, value: string } } = {};
+
+    // Accuracy
+    const accFunc = getAccuracyFunction(model.id, selections.pressureRange || '')?.func;
+    const accuracyValue = accFunc ? accFunc(r) : null;
+    specs.accuracy = {
+        name: t('spec_accuracy'),
+        value: accuracyValue !== null ? `±${accuracyValue.toFixed(4)} % FS` : t('spec_notApplicable')
+    };
+
+    // Long Term Stability
+    specs.longTermStability = {
+        name: t('spec_longTermStability'),
+        value: `±0.1% URL / 10 ${t('spec_years')}`
+    };
+    
+    // Temperature Effect
+    const tempEffect = 0.06 * r + 0.01;
+    let tempNote = t('spec_tempEffect_note');
+    const rangeCat = model.configuration.find(c => c.id === 'pressureRange');
+    const rangeOpt = rangeCat?.options.find(o => o.code === selections.pressureRange);
+    if (rangeOpt && rangeOpt.unit === 'kPa' && rangeOpt.max && rangeOpt.max < 40) {
+        tempNote = t('spec_tempEffect_note_doubled');
+    }
+    specs.temperatureEffect = {
+        name: t('spec_temperatureEffect'),
+        value: `±${tempEffect.toFixed(4)}% FS * N (${tempNote})`
+    };
+
+    // Vibration Effect
+    const vibrationEffect = 0.03 + 0.0025 * r;
+    specs.vibrationEffect = {
+        name: t('spec_vibrationEffect'),
+        value: `±${vibrationEffect.toFixed(4)} % FS`
+    };
+
+    // Power Supply Effect
+    const powerSupplyEffect = 0.025 + 0.0025 * r;
+    specs.powerSupplyEffect = {
+        name: t('spec_powerSupplyEffect'),
+        value: `±${powerSupplyEffect.toFixed(4)} % FS`
+    };
+    
+    // Static Pressure Effects (for RTX2500D)
+    if (model.id === 'RTX2500D' && selections.pressureRange) {
+        const rangeCode = selections.pressureRange;
+        let staticPressureEffect = '';
+        if (['B0', 'D0'].includes(rangeCode)) {
+            staticPressureEffect = `±${(0.2 * r).toFixed(2)}% FS / 200 kPa`
+        } else if (rangeCode === 'D1') {
+            staticPressureEffect = `±${(0.1 * r).toFixed(2)}% FS / 3.2 MPa`
+        } else if (['D3', 'D5', 'D6', 'D7'].includes(rangeCode)) {
+            staticPressureEffect = `±${(0.04 * r).toFixed(2)}% FS / 16 MPa`
+        }
+        if (staticPressureEffect) {
+            specs.staticPressureEffect = {
+                name: t('spec_staticPressureEffect'),
+                value: staticPressureEffect
+            }
+        }
+    }
+
+    return specs;
+};
