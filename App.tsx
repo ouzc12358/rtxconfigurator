@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Configurator } from './components/Configurator';
 import { Summary } from './components/Summary';
@@ -99,13 +100,14 @@ const ImageZoomModal: React.FC<ImageZoomModalProps> = ({ image, onClose, t }) =>
 interface PerformanceCalculatorProps {
     model: ProductModel;
     selections: Selections;
+    initialRange: { low: string; high: string; };
     onClose: () => void;
     onCalculationUpdate: (result: PerformanceResult | null) => void;
     t: TFunction;
 }
 
-const PerformanceCalculator: React.FC<PerformanceCalculatorProps> = ({ model, selections, onClose, onCalculationUpdate, t }) => {
-    const [userRange, setUserRange] = useState({ low: '', high: '' });
+const PerformanceCalculator: React.FC<PerformanceCalculatorProps> = ({ model, selections, initialRange, onClose, onCalculationUpdate, t }) => {
+    const [userRange, setUserRange] = useState(initialRange);
     
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -635,6 +637,7 @@ const App: React.FC = () => {
                 <PerformanceCalculator 
                     model={selectedModel}
                     selections={selections}
+                    initialRange={customRange}
                     onClose={() => setPerformanceVisible(false)}
                     onCalculationUpdate={setPerformanceResult}
                     t={t}

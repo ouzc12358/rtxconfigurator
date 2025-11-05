@@ -1,5 +1,6 @@
 
-import React, { useMemo, useState } from 'react';
+
+import React, { useMemo, useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import type { ProductModel, Selections, Option, PerformanceResult, PerformanceSpec } from '../types';
 import { uiTranslations } from '../data/translations';
@@ -18,7 +19,7 @@ interface SummaryProps {
     onSpecialRequestChange: (request: string) => void;
     onCalculatePerformance: () => void;
     performanceResult: PerformanceResult | null;
-    t: (key: keyof typeof uiTranslations.en) => string;
+    t: (key: keyof typeof uiTranslations.en, ...args: any[]) => string;
 }
 
 const generateTransmitterModelNumber = (
@@ -82,9 +83,124 @@ const generateManifoldModelNumber = (model: ProductModel, selections: Selections
     return `SS2000-${manifoldTypeCode}${manifoldParts}`;
 };
 
+// --- Email Modal Component ---
+const EmailModal: React.FC<{
+    onClose: () => void;
+    onSend: (details: { recipient: string, sender: string, message: string }) => void;
+    t: (key: keyof typeof uiTranslations.en) => string;
+}> = ({ onClose, onSend, t }) => {
+    const [recipient, setRecipient] = useState('');
+    const [sender, setSender] = useState('');
+    const [message, setMessage] = useState('');
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        document.body.style.overflow = 'hidden';
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.body.style.overflow = '';
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [onClose]);
+
+    const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+    const handleSubmit = () => {
+        if (!recipient) {
+            setError(t('recipientRequiredError'));
+            return;
+        }
+        if (!validateEmail(recipient)) {
+            setError(t('invalidEmailError'));
+            return;
+        }
+        setError('');
+        onSend({ recipient, sender, message });
+    };
+
+    return (
+        <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm transition-opacity animate-fade-in"
+            onClick={onClose}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="email-modal-title"
+        >
+            <style>{`
+                @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes zoom-in { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+                .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
+                .animate-zoom-in { animation: zoom-in 0.2s ease-out forwards; }
+            `}</style>
+            <div 
+                className="bg-white rounded-lg shadow-xl p-6 m-4 max-w-md w-full transform transition-transform animate-zoom-in"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <h3 id="email-modal-title" className="text-lg font-bold text-gray-800 flex items-center">
+                    {t('emailModalTitle')}
+                </h3>
+                <div className="mt-4 space-y-4">
+                    <div>
+                        <label htmlFor="recipient-email" className="block text-sm font-medium text-gray-700">{t('recipientEmailLabel')}</label>
+                        <input
+                            type="email"
+                            id="recipient-email"
+                            value={recipient}
+                            onChange={(e) => setRecipient(e.target.value)}
+                            placeholder={t('recipientEmailPlaceholder')}
+                            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${error ? 'border-red-500' : 'border-gray-300'}`}
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="sender-name" className="block text-sm font-medium text-gray-700">{t('senderNameLabel')}</label>
+                        <input
+                            type="text"
+                            id="sender-name"
+                            value={sender}
+                            onChange={(e) => setSender(e.target.value)}
+                            placeholder={t('senderNamePlaceholder')}
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+                     <div>
+                        <label htmlFor="optional-message" className="block text-sm font-medium text-gray-700">{t('optionalMessageLabel')}</label>
+                        <textarea
+                            id="optional-message"
+                            rows={3}
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+                    {error && <p className="text-sm text-red-600">{error}</p>}
+                </div>
+                <div className="mt-6 flex justify-end space-x-3">
+                    <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        {t('cancel')}
+                    </button>
+                    <button onClick={handleSubmit} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        {t('sendEmail')}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagChange, customRange, onCustomRangeChange, specialRequest, onSpecialRequestChange, onCalculatePerformance, performanceResult, t }) => {
     const [isCopied, setIsCopied] = useState(false);
+    const [showPdfConfirm, setShowPdfConfirm] = useState(false);
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+    const [isEmailModalVisible, setEmailModalVisible] = useState(false);
+    const [emailButtonText, setEmailButtonText] = useState(t('emailConfig'));
+
+     useEffect(() => {
+        setEmailButtonText(t('emailConfig'));
+    }, [t]);
     
     const { 
         transmitterModelLines, 
@@ -188,6 +304,29 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
         });
     };
 
+    const handleSendEmail = ({ recipient, sender, message }: { recipient: string, sender: string, message: string }) => {
+        const subject = t('emailSubject', { modelName: model.name });
+        let body = '';
+        if (message) {
+            body += message + '\n\n';
+        }
+        if (sender) {
+            body += t('emailBodyFrom', { senderName: sender }) + '\n\n';
+        }
+        body += '--- Configuration Details ---\n\n';
+        body += fullConfigText;
+    
+        const mailtoLink = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        
+        window.location.href = mailtoLink;
+    
+        setEmailModalVisible(false);
+        setEmailButtonText(t('emailSentSuccess'));
+        setTimeout(() => {
+            setEmailButtonText(t('emailConfig'));
+        }, 3000);
+    };
+
     const handleExportToFile = () => {
         const exportData = {
             productModel: model.name,
@@ -229,218 +368,266 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
         URL.revokeObjectURL(url);
     };
 
-    const handleExportToPdf = async () => {
-        // @ts-ignore - jspdf is loaded from CDN
-        const { jsPDF } = window.jspdf;
-        if (!jsPDF) {
-            alert(t('alert_pdfLibraryNotLoaded'));
-            return;
-        }
-    
-        const doc = new jsPDF();
-    
-        // --- English-only setup ---
-        const t_en = (key: keyof typeof uiTranslations.en) => uiTranslations.en[key];
-        const enProductModels = getTranslatedProductData('en');
-        const enModel = enProductModels.find(m => m.id === model.id);
-    
-        if (!enModel) {
-            alert("Could not find English product data for PDF export.");
-            return;
-        }
-    
-        const enSelectedOptionsList = enModel.configuration
-            .map(category => {
-                const selectedCode = selections[category.id];
-                if (!selectedCode) return null;
-                const option = category.options.find(o => o.code === selectedCode);
-                return option ? { category: category.title, code: option.code, description: option.description } : null;
-            })
-            .filter((item): item is { category: string; code: string; description: string; } => item !== null);
-        
-        const enRangeOption = enModel.configuration.find(c => c.id === 'pressureRange')?.options.find(o => o.code === selections.pressureRange);
-        
-        const [enLine1, enLine2, enLine3, enLine4] = generateTransmitterModelNumber(enModel, selections, customRange, enRangeOption, isCustomRangeValidAndSet, specialRequest, t_en);
-        const enManifoldNumber = generateManifoldModelNumber(enModel, selections);
-    
-        // --- PDF Generation Logic ---
-        const logoUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAoALADASIAAhEBAxEB/8QAGwABAQACAwEAAAAAAAAAAAAAAAYDBwECBAX/xAAwEAABAwIEBAQEBwAAAAAAAAABAgMEBREABgcSITFBUQgTImEVFjJCcYGRobHB0f/EABkBAQADAQEAAAAAAAAAAAAAAAABAgMEBf/EACERAQABAwQCAwAAAAAAAAAAAAABAgMREiExQVEEE2Fx/9oADAMBAAIRAxEAPwD2OMYxgDGxjAGNjGAMbGMAdsY1gCMeR+IuPXuGOHhWKbSmas+uUzFS047ykhSybk2O4A7bn5GuA/8AmHU//paB+oO//wCq7I4+rz+TTDjX1/f9I8sH+M+qS8x2n9PUMY8s/8AmLU+3wNA/UHf/wCvQ8l+L2Vcf5LDo0rKcjoFHYfUtEhurLhWpNrpsmOu1tx33rbFwc+c1w5V9Ixx15cK+p6ljYxjmXMbGMAdsYxgDGxjAGNjGAMbGMAdsYxgB2xjGAIuYV+lZVSZNWrc5iDBjJK3XnlBKUgC5O5/meK+KPirmnH2tU3hHglUhNPmvoZflNBQVLJJFrj+VgG6jvfbYAm1x/GHj/VeP+IVcN8IVKSjK2nCy9JiqKVTiDZZCiPyN9AbWURe9gBXrHg/wCAuV8D5bHq9Xis1bOKg2FvzXkBfklQBCGiRZI33FlG5uQLC1mZ1T5fU/0/k9XwS4VpfCXDlLynT2h4UdoKccP+o+s3W4fmpRJ+gAFgK38YxzltsbGMAbGMAbGMAY2MYA//2Q==';
-    
-        doc.addImage(logoUrl, 'JPEG', 15, 10, 50, 10);
-        doc.setFontSize(18);
-        doc.setFont(undefined, 'bold');
-        doc.text(t_en('pdf_reportTitle'), 105, 20, { align: 'center' });
-        doc.setFontSize(10);
-        doc.setFont(undefined, 'normal');
-        doc.text(`${t_en('pdf_date')}: ${new Date().toLocaleDateString()}`, 195, 28, { align: 'right' });
-
-        let y = 40;
-        const lineSpacing = 6;
-        const sectionSpacing = 10;
-        const pageMargin = 15;
-        const contentWidth = doc.internal.pageSize.getWidth() - (pageMargin * 2);
-        const keyX = pageMargin;
-        const valueX = 75;
-
-        const checkPageBreak = () => {
-            if (y > 280) {
-                doc.addPage();
-                y = 20;
-            }
-        };
-        
-        const addSectionHeader = (text: string) => {
-            checkPageBreak();
-            doc.setFontSize(12);
-            doc.setFont(undefined, 'bold');
-            doc.text(text, keyX, y);
-            y += lineSpacing + 2;
-        };
-
-        const addKeyValue = (key: string, value: string) => {
-            if (!value) return;
-            checkPageBreak();
-            doc.setFontSize(10);
-            doc.setFont(undefined, 'bold');
-            doc.text(key, keyX, y);
-            doc.setFont(undefined, 'normal');
-            const splitValue = doc.splitTextToSize(value, contentWidth - (valueX - keyX));
-            doc.text(splitValue, valueX, y);
-            y += splitValue.length * 5 + 2;
-        };
-        
-        addSectionHeader(t_en('summaryTitle'));
-        addKeyValue(`${t_en('pdf_model')}:`, enModel.name);
-        if (tag) addKeyValue(`${t_en('pdf_tagNumber')}:`, tag);
-        y += sectionSpacing / 2;
-        
-        addSectionHeader(t_en('pdf_transmitterTitle'));
-        addKeyValue(`${t_en('pdf_line1')}:`, enLine1);
-        addKeyValue(`${t_en('pdf_line2')}:`, enLine2);
-        addKeyValue(`${t_en('pdf_line3')} (${isCustomRangeValidAndSet ? t_en('calibratedRange') : t_en('selectedRange')}):`, enLine3);
-        if (specialRequest) addKeyValue(`${t_en('pdf_line4')} (${t_en('specialRequestsLabel')}):`, specialRequest);
-        y += sectionSpacing / 2;
-
-        if (enManifoldNumber) {
-            addSectionHeader(t_en('pdf_manifoldTitle'));
-            addKeyValue(t_en('pdf_fullCode'), enManifoldNumber);
-            y += sectionSpacing / 2;
-        }
-        
-        addSectionHeader(t_en('pdf_configDetailsTitle'));
-        enSelectedOptionsList.forEach(item => {
-            addKeyValue(`${item.category}:`, `${item.description} (${item.code})`);
-        });
-
-        if (isCustomRangeValidAndSet) {
-             addKeyValue(`${t_en('customRangeLabel')}:`, `${customRange.low} to ${customRange.high} ${enRangeOption?.unit}`);
-        }
-
-        // --- Add Performance Report Section (always in English) ---
-        if (performanceResult) {
-            // Force a new page for the performance report for better layout
-            doc.addPage();
-            y = 20;
-            
-            addSectionHeader(t_en('performanceReportTitle'));
-            
-            // Create a hidden container to render the chart for conversion
-            const chartContainer = document.createElement('div');
-            chartContainer.style.position = 'absolute';
-            chartContainer.style.left = '-9999px'; // Position off-screen
-            document.body.appendChild(chartContainer);
-
-            let chartImageData: string | null = null;
-            try {
-                 chartImageData = await new Promise((resolve, reject) => {
-                    const accuracyData = getAccuracyFunction(enModel.id, selections.pressureRange || '');
-                    
-                    const enRangeOpt = enModel.configuration.find(c => c.id === 'pressureRange')?.options.find(o => o.code === selections.pressureRange);
-                    const maxSpan = (enRangeOpt?.max ?? 0) - (enRangeOpt?.min ?? 0);
-                    const minSpan = enRangeOpt?.minSpan ?? 1;
-                    let maxRatio = minSpan > 0 ? maxSpan / minSpan : 1;
-                    const accuracyDataForMaxRatio = getAccuracyFunction(enModel.id, selections.pressureRange || '');
-                    maxRatio = Math.min(maxRatio, accuracyDataForMaxRatio?.maxRatio ?? Infinity);
-
-
-                    const chartRoot = ReactDOM.createRoot(chartContainer);
-                    chartRoot.render(
-                        <AccuracyChart
-                            accuracyFunction={accuracyData?.func ?? null}
-                            currentRatio={performanceResult.ratio}
-                            currentAccuracy={performanceResult.specs.accuracy.accuracyValue ?? null}
-                            maxRatio={maxRatio}
-                            t={t_en}
-                        />
-                    );
-
-                    setTimeout(() => {
-                        const svgElement = chartContainer.querySelector('svg');
-                        if (!svgElement) {
-                            return reject('Could not find SVG element for chart.');
-                        }
-                        const svgString = new XMLSerializer().serializeToString(svgElement);
-                        const canvas = document.createElement('canvas');
-                        
-                        // Use intrinsic SVG dimensions for better quality
-                        canvas.width = svgElement.width.baseVal.value * 2; // Render at 2x for better resolution
-                        canvas.height = svgElement.height.baseVal.value * 2;
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx) {
-                             return reject('Could not get canvas context.');
-                        }
-                        ctx.scale(2, 2);
-
-                        const img = new Image();
-                        img.onload = () => {
-                            ctx.drawImage(img, 0, 0);
-                            resolve(canvas.toDataURL('image/png'));
-                        };
-                        img.onerror = () => reject('Error loading SVG as image for PDF conversion.');
-                        img.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgString)))}`;
-                    }, 200); // Small delay to ensure SVG has rendered
-                });
-            } catch (error) {
-                console.error("PDF Chart Generation Error:", error);
-                alert(t_en('alert_pdfGenerationError'));
-            } finally {
-                document.body.removeChild(chartContainer);
-            }
-            
-            if (chartImageData) {
-                const imgProps = doc.getImageProperties(chartImageData);
-                const pdfWidth = doc.internal.pageSize.getWidth();
-                const imgWidth = pdfWidth - pageMargin * 2 - 40; // Smaller width for better layout
-                const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-                doc.addImage(chartImageData, 'PNG', pageMargin + 20, y, imgWidth, imgHeight);
-                y += imgHeight + 8;
-            }
-
-
-            const { ratio, userRange } = performanceResult;
-            const enPerformanceSpecs = calculatePerformanceSpecs(enModel, selections, ratio, t_en);
-            const enPerfRangeOption = enModel.configuration.find(c => c.id === 'pressureRange')?.options.find(o => o.code === selections.pressureRange);
-
-            addKeyValue(t_en('enterCalibrationRange'), `${userRange.low} to ${userRange.high} ${enPerfRangeOption?.unit || ''}`);
-            if (ratio) addKeyValue(t_en('turndownRatio'), `${ratio.toFixed(2)}:1`);
-            
-            y += sectionSpacing / 2;
-            
-            doc.setFont(undefined, 'bold');
-            doc.text(t_en('parameter'), keyX, y);
-            doc.text(t_en('performance'), valueX, y);
-            y += lineSpacing;
-            doc.line(keyX, y - (lineSpacing / 2), contentWidth + keyX, y - (lineSpacing / 2));
-
-            (Object.values(enPerformanceSpecs) as PerformanceSpec[]).forEach(spec => {
-                addKeyValue(spec.name, spec.value);
-            });
-        }
-
-        const date = new Date().toISOString().split('T')[0];
-        doc.save(`${model.name.replace(/\s/g, '_')}_Configuration_${date}.pdf`);
+    const handleExportToPdf = () => {
+        setShowPdfConfirm(true);
     };
 
+    const proceedWithPdfExport = async () => {
+        setShowPdfConfirm(false);
+        setIsGeneratingPdf(true);
+        try {
+            // @ts-ignore - jspdf is loaded from CDN
+            const { jsPDF } = window.jspdf;
+            if (!jsPDF) {
+                throw new Error(t('alert_pdfLibraryNotLoaded'));
+            }
+        
+            const doc = new jsPDF();
+        
+            // --- English-only setup ---
+            const t_en = (key: keyof typeof uiTranslations.en) => uiTranslations.en[key];
+            const enProductModels = getTranslatedProductData('en');
+            const enModel = enProductModels.find(m => m.id === model.id);
+        
+            if (!enModel) {
+                throw new Error("Could not find English product data for PDF export.");
+            }
+        
+            const enSelectedOptionsList = enModel.configuration
+                .map(category => {
+                    const selectedCode = selections[category.id];
+                    if (!selectedCode) return null;
+                    const option = category.options.find(o => o.code === selectedCode);
+                    return option ? { category: category.title, code: option.code, description: option.description } : null;
+                })
+                .filter((item): item is { category: string; code: string; description: string; } => item !== null);
+            
+            const enRangeOption = enModel.configuration.find(c => c.id === 'pressureRange')?.options.find(o => o.code === selections.pressureRange);
+            
+            const [enLine1, enLine2, enLine3, enLine4] = generateTransmitterModelNumber(enModel, selections, customRange, enRangeOption, isCustomRangeValidAndSet, specialRequest, t_en);
+            const enManifoldNumber = generateManifoldModelNumber(enModel, selections);
+        
+            // --- PDF Generation Logic ---
+            const logoUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAmAHMDASIAAhEBAxEB/8QAGwAAAgMBAQEAAAAAAAAAAAAAAAYDBAUCAQf/xAAwEAACAQMDAwMDAwQCAwAAAAABAgMABBEFEiETMQZBURQiYXEHMhUjUpGhscFSYtH/xAAZAQEAAwEBAAAAAAAAAAAAAAAAAQIDBAX/xAAnEQACAgIBAwQCAwEAAAAAAAAAAQIRAxIhBBMxQVEiBWFxkUKBof/aAAwDAQACEQMRAD8A9UooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAChJIUEsQABkk9hRRQAt3XV447e4GnS5nkiI325BwM+dSO/tzg5qS/WdWsZDbz6f5MowGRsgg/IINdCii9zQ1J8U998g/wDqN+lX2UuqXM1jPPaWskscduzh0UnDBSR09+OKy+k6hcarE09xbywhQhUSKQcsoJHPsSRXQ6xbfedMvLUcebC6fBBB/eq20u3+zafbW/wD3YlT+QBVXG00XJ2rT0VKKKKcgKKKKACiiigAooooADXlPqt4h1f6g1iWUkxWyGKMegUZP5JNeonpXgP1UoP/AOwv2J63Ev+41fH5N8ftZ6f4cn/yI2GjzG+1fTrAAm6u44sHoScn8CteO/tT16bYadYRFvPkM0gHoowo/Mk/lXQ23iG0h/ZH93yB501k1qFz1Lkgn8gT+Veb6BfC+/bBYsxyI7l7f8A4xsP/NacY3bXhGjK0lLuR9LooorIahRRRQAUUUUAFY37TNSbS/CmoTRNsllAijIOCdxwf0zWzrzf8Aas+y1jQh/vJ1P8AVx/oaeG7RXkXuZ5ToOgS+Jtbs9ItiFkuX27iMhV6kn5ABNd1dfsh1+O3Z7e8sppAPuKzISfkQMVX/sjsvP8AEF9eEZFtapg+zMR/pU17bRRUcnSKZaStnmep6TeaNfTaffwmG6gbbJGSDg/I4P51X13X7RLE3nhTT5MZaS7mY/O5v/ABXM1DVaRpN2woooqRhRRRQAUUUUAFeL/ALWpDda5o1kvUXEqKB7lwo/3V7RXh/1kUaj9WPDumLyI5bYbf8AiYk/7VPH6l8Ecr0o+T0P6fsIdDsbJf8A9q3SIf4RiuhrJ+n5PM8LaW2c/wB0q/pxWxqqk43bYk7VBRRRQkFFFFAAa8w/a4wGnaIg+9JcOw+gQD/U16fXmP7Wl3TaXo4H3ZLl2P0Cgf6mqcNTRXkXsz/2Q==';
+            doc.addImage(logoUrl, 'JPEG', 15, 10, 50, 10);
+            doc.setFontSize(18);
+            doc.setFont(undefined, 'bold');
+            doc.text(t_en('pdf_reportTitle'), 105, 20, { align: 'center' });
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.text(`${t_en('pdf_date')}: ${new Date().toLocaleDateString()}`, 195, 28, { align: 'right' });
+
+            let y = 40;
+            const lineSpacing = 6;
+            const sectionSpacing = 10;
+            const pageMargin = 15;
+            const contentWidth = doc.internal.pageSize.getWidth() - (pageMargin * 2);
+            const keyX = pageMargin;
+            const valueX = 75;
+
+            const checkPageBreak = () => {
+                if (y > 280) {
+                    doc.addPage();
+                    y = 20;
+                }
+            };
+            
+            const addSectionHeader = (text: string) => {
+                checkPageBreak();
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text(text, keyX, y);
+                y += lineSpacing + 2;
+            };
+
+            const addKeyValue = (key: string, value: string) => {
+                if (!value && value !== "") return;
+                checkPageBreak();
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'bold');
+                doc.text(key, keyX, y);
+                doc.setFont(undefined, 'normal');
+                const splitValue = doc.splitTextToSize(value, contentWidth - (valueX - keyX));
+                doc.text(splitValue, valueX, y);
+                y += splitValue.length * 5 + 2;
+            };
+            
+            addSectionHeader(t_en('summaryTitle'));
+            addKeyValue(`${t_en('pdf_tagNumber')}:`, tag);
+            addKeyValue(`${t_en('pdf_model')}:`, enModel.name);
+            y += sectionSpacing / 2;
+            
+            addSectionHeader(t_en('pdf_transmitterTitle'));
+            addKeyValue(`${t_en('pdf_line1')}:`, enLine1);
+            addKeyValue(`${t_en('pdf_line2')}:`, enLine2);
+            addKeyValue(`${t_en('pdf_line3')} (${isCustomRangeValidAndSet ? t_en('calibratedRange') : t_en('selectedRange')}):`, enLine3);
+            if (specialRequest) addKeyValue(`${t_en('pdf_line4')} (${t_en('specialRequestsLabel')}):`, specialRequest);
+            y += sectionSpacing / 2;
+
+            if (enManifoldNumber) {
+                addSectionHeader(t_en('pdf_manifoldTitle'));
+                addKeyValue(t_en('pdf_fullCode'), enManifoldNumber);
+                y += sectionSpacing / 2;
+            }
+            
+            addSectionHeader(t_en('pdf_configDetailsTitle'));
+            enSelectedOptionsList.forEach(item => {
+                addKeyValue(`${item.category}:`, `${item.description} (${item.code})`);
+            });
+
+            if (isCustomRangeValidAndSet) {
+                 addKeyValue(`${t_en('customRangeLabel')}:`, `${customRange.low} to ${customRange.high} ${enRangeOption?.unit}`);
+            }
+
+            // --- Add Performance Report Section (always in English) ---
+            if (performanceResult) {
+                doc.addPage();
+                y = 20;
+                addSectionHeader(t_en('performanceReportTitle'));
+                
+                const chartContainer = document.createElement('div');
+                chartContainer.style.position = 'absolute';
+                chartContainer.style.left = '-9999px';
+                document.body.appendChild(chartContainer);
+
+                let chartImageData: string | null = null;
+                try {
+                     chartImageData = await new Promise((resolve, reject) => {
+                        const accuracyData = getAccuracyFunction(enModel.id, selections.pressureRange || '');
+                        const enRangeOpt = enModel.configuration.find(c => c.id === 'pressureRange')?.options.find(o => o.code === selections.pressureRange);
+                        const maxSpan = (enRangeOpt?.max ?? 0) - (enRangeOpt?.min ?? 0);
+                        const minSpan = enRangeOpt?.minSpan ?? 1;
+                        let maxRatio = minSpan > 0 ? maxSpan / minSpan : 1;
+                        const accuracyDataForMaxRatio = getAccuracyFunction(enModel.id, selections.pressureRange || '');
+                        maxRatio = Math.min(maxRatio, accuracyDataForMaxRatio?.maxRatio ?? Infinity);
+
+                        const chartRoot = ReactDOM.createRoot(chartContainer);
+                        chartRoot.render(
+                            <AccuracyChart
+                                accuracyFunction={accuracyData?.func ?? null}
+                                currentRatio={performanceResult.ratio}
+                                currentAccuracy={performanceResult.specs.accuracy.accuracyValue ?? null}
+                                maxRatio={maxRatio}
+                                t={t_en}
+                            />
+                        );
+
+                        setTimeout(() => {
+                            const svgElement = chartContainer.querySelector('svg');
+                            if (!svgElement) return reject('Could not find SVG element for chart.');
+                            
+                            const svgString = new XMLSerializer().serializeToString(svgElement);
+                            const canvas = document.createElement('canvas');
+                            canvas.width = svgElement.width.baseVal.value * 2;
+                            canvas.height = svgElement.height.baseVal.value * 2;
+                            const ctx = canvas.getContext('2d');
+                            if (!ctx) return reject('Could not get canvas context.');
+                            
+                            ctx.scale(2, 2);
+                            const img = new Image();
+                            img.onload = () => {
+                                ctx.drawImage(img, 0, 0);
+                                resolve(canvas.toDataURL('image/png'));
+                            };
+                            img.onerror = () => reject('Error loading SVG as image for PDF conversion.');
+                            img.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgString)))}`;
+                        }, 200);
+                    });
+                } finally {
+                    document.body.removeChild(chartContainer);
+                }
+                
+                if (chartImageData) {
+                    const imgProps = doc.getImageProperties(chartImageData);
+                    const pdfWidth = doc.internal.pageSize.getWidth();
+                    const imgWidth = pdfWidth - pageMargin * 2 - 40;
+                    const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+                    doc.addImage(chartImageData, 'PNG', pageMargin + 20, y, imgWidth, imgHeight);
+                    y += imgHeight + 8;
+                }
+
+                const { ratio, userRange } = performanceResult;
+                const enPerformanceSpecs = calculatePerformanceSpecs(enModel, selections, ratio, t_en);
+                const enPerfRangeOption = enModel.configuration.find(c => c.id === 'pressureRange')?.options.find(o => o.code === selections.pressureRange);
+
+                addKeyValue(t_en('enterCalibrationRange'), `${userRange.low} to ${userRange.high} ${enPerfRangeOption?.unit || ''}`);
+                if (ratio) addKeyValue(t_en('turndownRatio'), `${ratio.toFixed(2)}:1`);
+                
+                y += sectionSpacing / 2;
+                doc.setFont(undefined, 'bold');
+                doc.text(t_en('parameter'), keyX, y);
+                doc.text(t_en('performance'), valueX, y);
+                y += lineSpacing;
+                doc.line(keyX, y - (lineSpacing / 2), contentWidth + keyX, y - (lineSpacing / 2));
+
+                (Object.values(enPerformanceSpecs) as PerformanceSpec[]).forEach(spec => {
+                    addKeyValue(spec.name, spec.value);
+                });
+            }
+
+            const date = new Date().toISOString().split('T')[0];
+            doc.save(`${model.name.replace(/\s/g, '_')}_Configuration_${date}.pdf`);
+        
+        } catch (error) {
+            console.error("PDF Export failed:", error);
+            alert(t('alert_pdfGenerationError'));
+        } finally {
+            setIsGeneratingPdf(false);
+        }
+    };
+
+    const PdfConfirmModal = ({ onConfirm, onClose, t }: { onConfirm: () => void, onClose: () => void, t: (key: keyof typeof uiTranslations.en) => string }) => {
+        useEffect(() => {
+            const handleKeyDown = (e: KeyboardEvent) => {
+                if (e.key === 'Escape') {
+                    onClose();
+                }
+            };
+            document.body.style.overflow = 'hidden';
+            window.addEventListener('keydown', handleKeyDown);
+            return () => {
+                document.body.style.overflow = '';
+                window.removeEventListener('keydown', handleKeyDown);
+            };
+        }, [onClose]);
+
+        return (
+            <div 
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm transition-opacity animate-fade-in"
+                onClick={onClose}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="pdf-confirm-title"
+            >
+                 <style>{`
+                    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+                    @keyframes zoom-in { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+                    .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
+                    .animate-zoom-in { animation: zoom-in 0.2s ease-out forwards; }
+                `}</style>
+                <div 
+                    className="bg-white rounded-lg shadow-xl p-6 m-4 max-w-md w-full transform transition-transform animate-zoom-in"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <h3 id="pdf-confirm-title" className="text-lg font-bold text-gray-800 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        {t('pdfConfirmTitle')}
+                    </h3>
+                    <p className="mt-3 text-sm text-gray-600">{t('pdfConfirmMessage')}</p>
+                    <div className="mt-6 flex justify-end space-x-3">
+                        <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            {t('pdfConfirmCancel')}
+                        </button>
+                        <button onClick={onConfirm} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            {t('pdfConfirmProceed')}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-lg">
@@ -531,7 +718,7 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
                 </ul>
             </div>
             
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="mt-6 grid grid-cols-2 gap-3">
                 <button
                     onClick={handleCopyToClipboard}
                     className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
@@ -552,31 +739,49 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
                     </svg>
                     {t('exportJson')}
                 </button>
-            </div>
-             <div className="mt-3 grid grid-cols-1 gap-3">
-                 <button
-                    onClick={handleExportToPdf}
+                <button
+                    onClick={() => setEmailModalVisible(true)}
                     className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                    aria-label={t('emailConfigAriaLabel')}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    {emailButtonText}
+                </button>
+                <button
+                    onClick={handleExportToPdf}
+                    disabled={isGeneratingPdf}
+                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
                     aria-label={t('exportPdfAriaLabel')}
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M4 0a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V2a2 2 0 00-2-2H4zm0 1h12a1 1 0 011 1v16a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1z"/>
-                        <path d="M6 8v9h2V8H6zm4 0v9h2V8h-2zm4 0v9h2V8h-2zM6 4h8v2H6V4z"/>
-                    </svg>
-                    {t('exportPdf')}
+                     {isGeneratingPdf ? (
+                        <svg className="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    ) : (
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    )}
+                    {isGeneratingPdf ? t('exportingPdf') : t('exportPdf')}
                 </button>
-                 <button
+            </div>
+            <div className="mt-3">
+                <button
                     onClick={onCalculatePerformance}
-                    disabled={!selections.pressureRange}
-                    className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
+                    disabled={!selectedRangeOption}
+                    className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
                     aria-label={t('calculatePerformanceAriaLabel')}
                 >
-                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 14.95a1 1 0 101.414 1.414l.707-.707a1 1 0 00-1.414-1.414l-.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1zM1.93 9.07a1 1 0 001.414-1.414l.707.707a1 1 0 00-1.414 1.414l-.707-.707z" />
+                      <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011 1zm5.657 2.757a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0zM10 18a1 1 0 01-1-1v-1a1 1 0 112 0v1a1 1 0 01-1 1z" />
                     </svg>
                     {t('calculatePerformance')}
                 </button>
             </div>
+            
+            {isEmailModalVisible && <EmailModal onClose={() => setEmailModalVisible(false)} onSend={handleSendEmail} t={t} />}
+            {showPdfConfirm && <PdfConfirmModal onConfirm={proceedWithPdfExport} onClose={() => setShowPdfConfirm(false)} t={t} />}
         </div>
     );
 };

@@ -13,7 +13,7 @@ export interface AccuracyChartProps {
 export const AccuracyChart: React.FC<AccuracyChartProps> = ({ accuracyFunction, currentRatio, currentAccuracy, maxRatio, t }) => {
     const width = 500;
     const height = 300;
-    const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+    const margin = { top: 20, right: 20, bottom: 40, left: 60 };
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
@@ -57,11 +57,11 @@ export const AccuracyChart: React.FC<AccuracyChartProps> = ({ accuracyFunction, 
                 <line x1={margin.left} y1={margin.top} x2={margin.left} y2={margin.top + innerHeight} stroke="currentColor" />
                 {[0, 0.25, 0.5, 0.75, 1].map(tick => (
                     <g key={tick}>
-                        <text x={margin.left - 8} y={yScale(tick * yMax) + 4} textAnchor="end">{`${(tick * yMax).toFixed(3)}%`}</text>
+                        <text x={margin.left - 8} y={yScale(tick * yMax) + 4} textAnchor="end">{`${(tick * yMax).toLocaleString('en-US', {minimumFractionDigits: 3, maximumFractionDigits: 3})}%`}</text>
                         <line x1={margin.left} x2={margin.left - 4} y={yScale(tick * yMax)} stroke="currentColor" />
                     </g>
                 ))}
-                <text transform={`translate(${margin.left-35}, ${margin.top + innerHeight/2}) rotate(-90)`} textAnchor="middle" className="font-semibold fill-current">{t('accuracy')}</text>
+                <text transform={`translate(${margin.left-48}, ${margin.top + innerHeight/2}) rotate(-90)`} textAnchor="middle" className="font-semibold fill-current">{t('accuracy')}</text>
             </g>
 
             {/* X Axis */}
