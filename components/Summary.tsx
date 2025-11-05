@@ -1,9 +1,11 @@
+
 import React, { useMemo, useState } from 'react';
-// FIX: Import PerformanceSpec to use for type casting.
+import ReactDOM from 'react-dom/client';
 import type { ProductModel, Selections, Option, PerformanceResult, PerformanceSpec } from '../types';
 import { uiTranslations } from '../data/translations';
 import { getTranslatedProductData } from '../data/i18n';
-import { calculatePerformanceSpecs } from '../data/productData';
+import { calculatePerformanceSpecs, getAccuracyFunction } from '../data/productData';
+import { AccuracyChart } from './AccuracyChart';
 
 interface SummaryProps {
     model: ProductModel;
@@ -209,7 +211,6 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
             performanceReport: performanceResult ? {
                 calibrationRange: `${performanceResult.userRange.low} to ${performanceResult.userRange.high} ${performanceResult.rangeOption?.unit}`,
                 turndownRatio: performanceResult.ratio ? `${performanceResult.ratio.toFixed(2)}:1` : 'N/A',
-                // FIX: Cast Object.values result to PerformanceSpec[] to ensure type safety, resolving 'unknown' type errors on properties.
                 specifications: (Object.values(performanceResult.specs) as PerformanceSpec[]).map(s => ({ [s.name]: s.value }))
             } : 'N/A'
         };
@@ -265,9 +266,6 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
         // --- PDF Generation Logic ---
         const logoUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAoALADASIAAhEBAxEB/8QAGwABAQACAwEAAAAAAAAAAAAAAAYDBwECBAX/xAAwEAABAwIEBAQEBwAAAAAAAAABAgMEBREABgcSITFBUQgTImEVFjJCcYGRobHB0f/EABkBAQADAQEAAAAAAAAAAAAAAAABAgMEBf/EACERAQABAwQCAwAAAAAAAAAAAAABAgMREiExQVEEE2Fx/9oADAMBAAIRAxEAPwD2OMYxgDGxjAGNjGAMbGMAdsY1gCMeR+IuPXuGOHhWKbSmas+uUzFS047ykhSybk2O4A7bn5GuA/8AmHU//paB+oO//wCq7I4+rz+TTDjX1/f9I8sH+M+qS8x2n9PUMY8s/8AmLU+3wNA/UHf/wCvQ8l+L2Vcf5LDo0rKcjoFHYfUtEhurLhWpNrpsmOu1tx33rbFwc+c1w5V9Ixx15cK+p6ljYxjmXMbGMAdsYxgDGxjAGNjGAMbGMAdsYxgB2xjGAIuYV+lZVSZNWrc5iDBjJK3XnlBKUgC5O5/meK+KPirmnH2tU3hHglUhNPmvoZflNBQVLJJFrj+VgG6jvfbYAm1x/GHj/VeP+IVcN8IVKSjK2nCy9JiqKVTiDZZCiPyN9AbWURe9gBXrHg/wCAuV8D5bHq9Xis1bOKg2FvzXkBfklQBCGiRZI33FlG5uQLC1mZ1T5fU/0/k9XwS4VpfCXDlLynT2h4UdoKccP+o+s3W4fmpRJ+gAFgK38YxzltsbGMAbGMAbGMAY2MYA//2Q==';
     
-        doc.addFont('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/fonts/Roboto/Roboto-Regular.ttf', 'Roboto', 'normal');
-        doc.setFont('Roboto');
-
         doc.addImage(logoUrl, 'JPEG', 15, 10, 50, 10);
         doc.setFontSize(18);
         doc.setFont(undefined, 'bold');
@@ -340,19 +338,87 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
 
         // --- Add Performance Report Section (always in English) ---
         if (performanceResult) {
-            y += sectionSpacing;
-            checkPageBreak();
-            
             // Force a new page for the performance report for better layout
             doc.addPage();
             y = 20;
             
             addSectionHeader(t_en('performanceReportTitle'));
+            
+            // Create a hidden container to render the chart for conversion
+            const chartContainer = document.createElement('div');
+            chartContainer.style.position = 'absolute';
+            chartContainer.style.left = '-9999px'; // Position off-screen
+            document.body.appendChild(chartContainer);
+
+            let chartImageData: string | null = null;
+            try {
+                 chartImageData = await new Promise((resolve, reject) => {
+                    const accuracyData = getAccuracyFunction(enModel.id, selections.pressureRange || '');
+                    
+                    const enRangeOpt = enModel.configuration.find(c => c.id === 'pressureRange')?.options.find(o => o.code === selections.pressureRange);
+                    const maxSpan = (enRangeOpt?.max ?? 0) - (enRangeOpt?.min ?? 0);
+                    const minSpan = enRangeOpt?.minSpan ?? 1;
+                    let maxRatio = minSpan > 0 ? maxSpan / minSpan : 1;
+                    const accuracyDataForMaxRatio = getAccuracyFunction(enModel.id, selections.pressureRange || '');
+                    maxRatio = Math.min(maxRatio, accuracyDataForMaxRatio?.maxRatio ?? Infinity);
+
+
+                    const chartRoot = ReactDOM.createRoot(chartContainer);
+                    chartRoot.render(
+                        <AccuracyChart
+                            accuracyFunction={accuracyData?.func ?? null}
+                            currentRatio={performanceResult.ratio}
+                            currentAccuracy={performanceResult.specs.accuracy.accuracyValue ?? null}
+                            maxRatio={maxRatio}
+                            t={t_en}
+                        />
+                    );
+
+                    setTimeout(() => {
+                        const svgElement = chartContainer.querySelector('svg');
+                        if (!svgElement) {
+                            return reject('Could not find SVG element for chart.');
+                        }
+                        const svgString = new XMLSerializer().serializeToString(svgElement);
+                        const canvas = document.createElement('canvas');
+                        
+                        // Use intrinsic SVG dimensions for better quality
+                        canvas.width = svgElement.width.baseVal.value * 2; // Render at 2x for better resolution
+                        canvas.height = svgElement.height.baseVal.value * 2;
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) {
+                             return reject('Could not get canvas context.');
+                        }
+                        ctx.scale(2, 2);
+
+                        const img = new Image();
+                        img.onload = () => {
+                            ctx.drawImage(img, 0, 0);
+                            resolve(canvas.toDataURL('image/png'));
+                        };
+                        img.onerror = () => reject('Error loading SVG as image for PDF conversion.');
+                        img.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgString)))}`;
+                    }, 200); // Small delay to ensure SVG has rendered
+                });
+            } catch (error) {
+                console.error("PDF Chart Generation Error:", error);
+                alert(t_en('alert_pdfGenerationError'));
+            } finally {
+                document.body.removeChild(chartContainer);
+            }
+            
+            if (chartImageData) {
+                const imgProps = doc.getImageProperties(chartImageData);
+                const pdfWidth = doc.internal.pageSize.getWidth();
+                const imgWidth = pdfWidth - pageMargin * 2 - 40; // Smaller width for better layout
+                const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+                doc.addImage(chartImageData, 'PNG', pageMargin + 20, y, imgWidth, imgHeight);
+                y += imgHeight + 8;
+            }
+
+
             const { ratio, userRange } = performanceResult;
-
-            // Recalculate specs in English for the PDF to ensure correct labels
             const enPerformanceSpecs = calculatePerformanceSpecs(enModel, selections, ratio, t_en);
-
             const enPerfRangeOption = enModel.configuration.find(c => c.id === 'pressureRange')?.options.find(o => o.code === selections.pressureRange);
 
             addKeyValue(t_en('enterCalibrationRange'), `${userRange.low} to ${userRange.high} ${enPerfRangeOption?.unit || ''}`);
@@ -360,15 +426,12 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
             
             y += sectionSpacing / 2;
             
-            // Add a header for the specs table
             doc.setFont(undefined, 'bold');
             doc.text(t_en('parameter'), keyX, y);
             doc.text(t_en('performance'), valueX, y);
             y += lineSpacing;
-            doc.line(keyX, y - 2, contentWidth + keyX, y - 2);
+            doc.line(keyX, y - (lineSpacing / 2), contentWidth + keyX, y - (lineSpacing / 2));
 
-
-            // FIX: Cast Object.values result to PerformanceSpec[] to ensure type safety, resolving potential 'unknown' type errors.
             (Object.values(enPerformanceSpecs) as PerformanceSpec[]).forEach(spec => {
                 addKeyValue(spec.name, spec.value);
             });
