@@ -741,12 +741,14 @@ export const calculatePerformanceSpecs = (model: ProductModel, selections: Selec
     if (model.id === 'RTX2500D' && selections.pressureRange) {
         const rangeCode = selections.pressureRange;
         let staticPressureEffect = '';
-        if (['B0', 'D0'].includes(rangeCode)) {
-            staticPressureEffect = `±${(0.2 * r).toFixed(2)}% FS / 200 kPa`
+        if (rangeCode === 'B0') {
+            staticPressureEffect = `±${(0.2 * r).toFixed(2)}% FS / 200 kPa`;
+        } else if (rangeCode === 'D0') {
+            staticPressureEffect = `±${(0.2 * r).toFixed(2)}% FS / 3.2 MPa`;
         } else if (rangeCode === 'D1') {
-            staticPressureEffect = `±${(0.1 * r).toFixed(2)}% FS / 3.2 MPa`
+            staticPressureEffect = `±${(0.1 * r).toFixed(2)}% FS / 3.2 MPa`;
         } else if (['D3', 'D5', 'D6', 'D7'].includes(rangeCode)) {
-            staticPressureEffect = `±${(0.04 * r).toFixed(2)}% FS / 16 MPa`
+            staticPressureEffect = `±${(0.04 * r).toFixed(2)}% FS / 16 MPa`;
         }
         if (staticPressureEffect) {
             specs.staticPressureEffect = {

@@ -1,5 +1,4 @@
-
-import React, { useMemo } from 'react';
+import React from 'react';
 import type { TFunction } from '../types';
 
 export interface AccuracyChartProps {
@@ -13,143 +12,105 @@ export interface AccuracyChartProps {
 export const AccuracyChart: React.FC<AccuracyChartProps> = ({ accuracyFunction, currentRatio, currentAccuracy, maxRatio, t }) => {
     const width = 500;
     const height = 300;
-    const margin = { top: 20, right: 30, bottom: 50, left: 60 };
+    // Increased left margin for better label spacing
+    const margin = { top: 20, right: 30, bottom: 40, left: 60 };
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
-    const { points, yMax } = useMemo(() => {
-        if (!accuracyFunction) return { points: [], yMax: 0.1 };
-        const dataPoints = [];
-        let maxY = 0.04; // Min y-axis value to handle flat lines
-        const step = maxRatio > 1 ? (maxRatio - 1) / 100 : 0;
-        for (let i = 0; i <= 100; i++) {
-            const r = 1 + i * step;
-            if (r > maxRatio) continue;
-            const acc = accuracyFunction(r);
-            if (acc !== null) {
-                dataPoints.push({ r, acc });
-                if (acc > maxY) maxY = acc;
-            }
-        }
-        if (currentAccuracy !== null && currentAccuracy > maxY) {
-            maxY = currentAccuracy;
-        }
-        return { points: dataPoints, yMax: Math.max(maxY * 1.2, 0.05) };
-    }, [accuracyFunction, maxRatio, currentAccuracy]);
-
-    const xScale = (r: number) => margin.left + ((r - 1) / (maxRatio > 1 ? maxRatio - 1 : 1)) * innerWidth;
-    const yScale = (acc: number) => margin.top + innerHeight - (acc / yMax) * innerHeight;
-
-    const pathData = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(p.r)} ${yScale(p.acc)}`).join(' ');
-
-    const xTicks = useMemo(() => {
-        const ticks = new Set([1]);
-        if (maxRatio > 1) {
-            const quarters = [0.25, 0.5, 0.75, 1];
-            quarters.forEach(q => {
-                const tickVal = 1 + q * (maxRatio - 1);
-                // For small ratios, don't round to avoid duplicate ticks
-                ticks.add(maxRatio < 10 ? parseFloat(tickVal.toFixed(1)) : Math.round(tickVal));
-            });
-        }
-        return Array.from(ticks).sort((a, b) => a - b);
-    }, [maxRatio]);
+    if (!accuracyFunction || maxRatio <= 1) {
+        return (
+            <div style={{ width: `${width}px`, height: `${height}px` }} className="flex items-center justify-center text-center p-4">
+                {currentAccuracy !== null && isFinite(currentAccuracy) ? (
+                    <div>
+                        <p className="text-lg text-gray-600 font-semibold mb-2">{t('spec_accuracy')}</p>
+                        <p className="text-5xl font-bold text-red-600">
+                            {`±${currentAccuracy.toPrecision(3)}% FS`}
+                        </p>
+                    </div>
+                ) : (
+                    <p className="text-gray-500">{t('enterRangeToCalculate')}</p>
+                )}
+            </div>
+        );
+    }
     
-    const yTicks = useMemo(() => {
-        const tickCount = 5;
-        const ticks = [];
-        for (let i = 0; i <= tickCount; i++) {
-            ticks.push((i / tickCount) * yMax);
+    const dataPoints: { r: number; acc: number }[] = [];
+    const steps = 100;
+    for (let i = 0; i <= steps; i++) {
+        const r = 1 + (i / steps) * (maxRatio - 1);
+        const acc = accuracyFunction(r);
+        if (acc !== null) {
+            dataPoints.push({ r, acc });
         }
-        return ticks;
-    }, [yMax]);
+    }
+    
+    if (dataPoints.length < 2) {
+       return (
+            <div style={{ width: `${width}px`, height: `${height}px` }} className="flex items-center justify-center text-gray-500">
+                <p>{t('enterRangeToCalculate')}</p>
+            </div>
+        );
+    }
 
+    const maxAccuracy = Math.max(...dataPoints.map(p => p.acc), 0.04) * 1.1; // Add padding
 
+    const xScale = (r: number) => (r - 1) / (maxRatio - 1) * innerWidth;
+    const yScale = (acc: number) => innerHeight - (acc / maxAccuracy) * innerHeight;
+
+    const linePath = dataPoints
+        .map(p => `${xScale(p.r).toFixed(2)},${yScale(p.acc).toFixed(2)}`)
+        .join(' L ');
+
+    const xTicks = [1, ...Array.from({ length: 4 }, (_, i) => 1 + ((maxRatio - 1) / 4) * (i + 1))];
+    const yTicks = Array.from({ length: 5 }, (_, i) => (maxAccuracy / 4) * i);
+    
     return (
-        <svg width={width} height={height} className="max-w-full" xmlns="http://www.w3.org/2000/svg" style={{ fontFamily: 'sans-serif' }}>
-            <g className="axes-and-labels">
-                {/* Y Axis */}
-                <line x1={margin.left} y1={margin.top} x2={margin.left} y2={margin.top + innerHeight} stroke="#9ca3af" strokeWidth="1" />
-                {yTicks.map(tick => (
-                    <g key={`y-tick-${tick}`} className="tick">
-                        <line x1={margin.left} y1={yScale(tick)} x2={margin.left - 5} y2={yScale(tick)} stroke="#9ca3af" strokeWidth="1" />
-                        <text
-                            x={margin.left - 8}
-                            y={yScale(tick)}
-                            textAnchor="end"
-                            alignmentBaseline="middle"
-                            fontSize="10px"
-                            fill="#4b5563"
-                        >
-                           {(tick * 100).toFixed(1)}
-                        </text>
+        // Use SVG attributes and inline styles instead of CSS classes for reliable PDF export
+        <svg 
+            viewBox={`0 0 ${width} ${height}`} 
+            width={width} 
+            height={height} 
+            style={{ 
+                fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif',
+                maxWidth: '100%' 
+            }}
+        >
+            <g transform={`translate(${margin.left}, ${margin.top})`}>
+                {/* Axes */}
+                <line x1="0" y1={innerHeight} x2={innerWidth} y2={innerHeight} stroke="#9ca3af" />
+                <line x1="0" y1="0" x2="0" y2={innerHeight} stroke="#9ca3af" />
+
+                {/* X-axis Ticks and Labels */}
+                {xTicks.map(tick => (
+                    <g key={`x-${tick}`} transform={`translate(${xScale(tick)}, ${innerHeight})`}>
+                        <line y2="5" stroke="#9ca3af" />
+                        <text y="20" textAnchor="middle" fontSize="12" fill="#4b5563">{tick.toFixed(0)}</text>
                     </g>
                 ))}
-                <text
-                    transform={`translate(20, ${margin.top + innerHeight / 2}) rotate(-90)`}
-                    textAnchor="middle"
-                    fontSize="12px"
-                    fontWeight="bold"
-                    fill="#374151"
-                >
-                    {t('accuracy')}
-                </text>
-
-                {/* X Axis */}
-                <line x1={margin.left} y1={margin.top + innerHeight} x2={margin.left + innerWidth} y2={margin.top + innerHeight} stroke="#9ca3af" strokeWidth="1" />
-                {xTicks.map(tick => (
-                     <g key={`x-tick-${tick}`} className="tick">
-                         <line x1={xScale(tick)} y1={margin.top + innerHeight} x2={xScale(tick)} y2={margin.top + innerHeight + 5} stroke="#9ca3af" strokeWidth="1" />
-                         <text
-                             x={xScale(tick)}
-                             y={margin.top + innerHeight + 18}
-                             textAnchor="middle"
-                             fontSize="10px"
-                             fill="#4b5563"
-                         >
-                            {`${tick.toFixed(tick < 10 ? 1 : 0)}:1`}
-                         </text>
-                     </g>
-                ))}
-                <text
-                    x={margin.left + innerWidth / 2}
-                    y={height - 10}
-                    textAnchor="middle"
-                    fontSize="12px"
-                    fontWeight="bold"
-                    fill="#374151"
-                >
+                <text x={innerWidth / 2} y={innerHeight + 35} textAnchor="middle" fontSize="14" fontWeight="600" fill="#374151">
                     {t('turndownRatio')}
                 </text>
-            </g>
 
-            <g className="chart-content">
-                {/* Grid lines */}
-                {yTicks.slice(1).map(tick => (
-                    <line key={`y-grid-${tick}`} x1={margin.left} y1={yScale(tick)} x2={margin.left + innerWidth} y2={yScale(tick)} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
+                {/* Y-axis Ticks and Labels */}
+                {yTicks.map(tick => (
+                    <g key={`y-${tick}`} transform={`translate(0, ${yScale(tick)})`}>
+                        <line x2="-5" stroke="#9ca3af" />
+                        <text x="-8" dy=".32em" textAnchor="end" fontSize="12" fill="#4b5563">{tick.toFixed(3)}</text>
+                    </g>
                 ))}
-                 {xTicks.slice(1).map(tick => (
-                    <line key={`x-grid-${tick}`} x1={xScale(tick)} y1={margin.top} x2={xScale(tick)} y2={margin.top + innerHeight} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
-                ))}
-
-                {/* Chart Line */}
-                {pathData && (
-                    <path d={pathData} fill="none" stroke="#3b82f6" strokeWidth="2" />
-                )}
+                <text transform={`translate(-45, ${innerHeight / 2}) rotate(-90)`} textAnchor="middle" fontSize="14" fontWeight="600" fill="#374151">
+                    {t('accuracy')}
+                </text>
+                
+                {/* Line */}
+                <path d={`M ${linePath}`} fill="none" stroke="steelblue" strokeWidth="2" />
 
                 {/* Current Point */}
-                {currentRatio !== null && currentAccuracy !== null && xScale(currentRatio) >= margin.left && (
-                    <g>
-                        <circle cx={xScale(currentRatio)} cy={yScale(currentAccuracy)} r="4" fill="#ef4444" stroke="white" strokeWidth="1" />
-                        <text
-                            x={xScale(currentRatio)}
-                            y={yScale(currentAccuracy) - 8}
-                            textAnchor="middle"
-                            fontSize="10px"
-                            fontWeight="bold"
-                            fill="#ef4444"
-                        >
-                            {`(${(currentRatio).toFixed(1)}:1, ${(currentAccuracy * 100).toFixed(2)}%)`}
+                {currentRatio !== null && currentAccuracy !== null && isFinite(currentRatio) && isFinite(currentAccuracy) && (
+                    <g transform={`translate(${xScale(currentRatio)}, ${yScale(currentAccuracy)})`}>
+                        <circle r="5" fill="#dc2626" />
+                        <text x="10" y="5" fontSize="14" fontWeight="bold" fill="#dc2626">
+                            {`±${currentAccuracy.toPrecision(3)}%`}
                         </text>
                     </g>
                 )}

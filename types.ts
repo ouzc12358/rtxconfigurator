@@ -1,5 +1,3 @@
-
-
 import type { uiTranslations } from './data/translations';
 export type TFunction = (key: keyof typeof uiTranslations.en, ...args: any[]) => string;
 
@@ -22,4 +20,5 @@ export interface PerformanceResult {
     ratio: number | null;
     userRange: { low: string; high: string; };
     rangeOption: Option | undefined;
+    maxRatio: number;
 }

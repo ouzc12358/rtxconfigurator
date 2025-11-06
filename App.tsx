@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Configurator } from './components/Configurator';
 import { Summary } from './components/Summary';
@@ -8,7 +6,7 @@ import { AccuracyChart } from './components/AccuracyChart';
 import { productModels as baseProductModels, calculatePerformanceSpecs, getAccuracyFunction } from './data/productData';
 import { getTranslatedProductData } from './data/i18n';
 import { uiTranslations } from './data/translations';
-import type { Selections, ProductModel, ImageInfo, TFunction, PerformanceResult } from './types';
+import type { Selections, ProductModel, ImageInfo, TFunction, PerformanceResult, PerformanceSpec } from './types';
 
 // Key for localStorage
 const LOCAL_STORAGE_KEY = 'druckRtxConfiguratorState';
@@ -120,6 +118,23 @@ const PerformanceCalculator: React.FC<PerformanceCalculatorProps> = ({ model, se
             window.removeEventListener('keydown', handleKeyDown);
         };
     }, [onClose]);
+    
+    const accuracyFunction = useMemo(() => getAccuracyFunction(model.id, selections.pressureRange || ''), [model.id, selections.pressureRange]);
+    
+    const maxRatio = useMemo(() => {
+        const rangeCat = model.configuration.find(c => c.id === 'pressureRange');
+        const rangeOpt = rangeCat?.options.find(o => o.code === selections.pressureRange);
+        if (!rangeOpt) return 1;
+
+        const maxSpan = (rangeOpt.max ?? 0) - (rangeOpt.min ?? 0);
+        const minSpan = rangeOpt.minSpan ?? 1;
+        
+        if (minSpan <= 0) return 1;
+        
+        const calculatedMaxRatio = maxSpan / minSpan;
+        
+        return Math.min(calculatedMaxRatio, accuracyFunction?.maxRatio ?? Infinity);
+    }, [model, selections.pressureRange, accuracyFunction]);
 
     const calculationResult = useMemo(() => {
         const rangeCat = model.configuration.find(c => c.id === 'pressureRange');
@@ -153,16 +168,14 @@ const PerformanceCalculator: React.FC<PerformanceCalculatorProps> = ({ model, se
         const maxSpan = (rangeOpt.max ?? 0) - (rangeOpt.min ?? 0);
         const r = maxSpan / calibratedSpan;
         
-        const accuracyData = getAccuracyFunction(model.id, selections.pressureRange || '');
-        const maxR = accuracyData?.maxRatio ?? Infinity;
-        if (r > maxR) {
-            return { specs: null, ratio: r, rangeOption: rangeOpt, error: t('turndownRatioError').replace('{maxRatio}', maxR.toFixed(0)) };
+        if (r > maxRatio) {
+            return { specs: null, ratio: r, rangeOption: rangeOpt, error: t('turndownRatioError').replace('{maxRatio}', maxRatio.toFixed(0)) };
         }
         
         const specs = calculatePerformanceSpecs(model, selections, r, t);
 
         return { specs, ratio: r, rangeOption: rangeOpt, error: null };
-    }, [model, selections, userRange, t]);
+    }, [model, selections, userRange, t, maxRatio]);
 
     const { specs, ratio, rangeOption, error } = calculationResult;
 
@@ -170,27 +183,9 @@ const PerformanceCalculator: React.FC<PerformanceCalculatorProps> = ({ model, se
         if (error) {
             onCalculationUpdate(null);
         } else if (specs) {
-            onCalculationUpdate({ specs, ratio, userRange, rangeOption });
+            onCalculationUpdate({ specs, ratio, userRange, rangeOption, maxRatio });
         }
-    }, [specs, ratio, userRange, rangeOption, error, onCalculationUpdate]);
-
-    const accuracyFunction = useMemo(() => getAccuracyFunction(model.id, selections.pressureRange || ''), [model.id, selections.pressureRange]);
-    
-    const maxRatio = useMemo(() => {
-        const rangeCat = model.configuration.find(c => c.id === 'pressureRange');
-        const rangeOpt = rangeCat?.options.find(o => o.code === selections.pressureRange);
-        if (!rangeOpt) return 1;
-
-        const maxSpan = (rangeOpt.max ?? 0) - (rangeOpt.min ?? 0);
-        const minSpan = rangeOpt.minSpan ?? 1;
-        
-        if (minSpan <= 0) return 1;
-        
-        const calculatedMaxRatio = maxSpan / minSpan;
-        const accuracyData = getAccuracyFunction(model.id, selections.pressureRange || '');
-        
-        return Math.min(calculatedMaxRatio, accuracyData?.maxRatio ?? Infinity);
-    }, [model, selections.pressureRange]);
+    }, [specs, ratio, userRange, rangeOption, error, onCalculationUpdate, maxRatio]);
 
     return (
          <div className="fixed inset-0 z-40 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -226,7 +221,6 @@ const PerformanceCalculator: React.FC<PerformanceCalculatorProps> = ({ model, se
                              />
                         </div>
                         {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
-                        {ratio && <p className="text-sm text-gray-600 mt-1">{t('turndownRatio')}: {ratio.toFixed(2)}:1</p>}
                         <p className="text-xs text-gray-500 mt-1">{t('minSpan')}: {rangeOption?.minSpan} {rangeOption?.unit}</p>
                     </div>
 
@@ -246,7 +240,7 @@ const PerformanceCalculator: React.FC<PerformanceCalculatorProps> = ({ model, se
                     <div>
                         <h3 className="text-lg font-semibold mb-2 text-gray-700">{t('specificationsTitle')}</h3>
                         {specs ? (
-                            <div className="border rounded-md">
+                            <div className="border rounded-md overflow-x-auto">
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50">
                                         <tr>
@@ -255,12 +249,17 @@ const PerformanceCalculator: React.FC<PerformanceCalculatorProps> = ({ model, se
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {Object.values(specs).map((spec) => {
-                                            const typedSpec = spec as { name: string; value: string };
+                                        {ratio && (
+                                            <tr key="turndown-ratio">
+                                                <td className="px-6 py-4 text-sm font-medium text-gray-900">{t('turndownRatio')}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-500 font-mono">{`${ratio.toFixed(2)}:1`}</td>
+                                            </tr>
+                                        )}
+                                        {(Object.values(specs) as PerformanceSpec[]).map((spec) => {
                                             return (
-                                                <tr key={typedSpec.name}>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{typedSpec.name}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{typedSpec.value}</td>
+                                                <tr key={spec.name}>
+                                                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{spec.name}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-500 font-mono">{spec.value}</td>
                                                 </tr>
                                             );
                                         })}
@@ -360,11 +359,12 @@ const App: React.FC = () => {
     };
 
     const handleSelectionsChange = (newSelections: Selections) => {
-        // Reset custom range if the pressure range selection changes
-        if (selections.pressureRange !== newSelections.pressureRange) {
-            setCustomRange({ low: '', high: '' });
-        }
-        setSelections(newSelections);
+        setSelections(prevSelections => {
+            if (prevSelections.pressureRange !== newSelections.pressureRange) {
+                setCustomRange({ low: '', high: '' });
+            }
+            return newSelections;
+        });
         setPerformanceResult(null); // Invalidate performance calc on any selection change
     };
 
@@ -601,6 +601,7 @@ const App: React.FC = () => {
                                 </div>
                                 <div className="lg:col-span-3">
                                     <Configurator
+                                        key={selectedModel.id}
                                         model={selectedModel}
                                         selections={selections}
                                         onSelectionChange={handleSelectionsChange}

@@ -1,11 +1,9 @@
-
-
 import React, { useMemo, useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import type { ProductModel, Selections, Option, PerformanceResult, PerformanceSpec } from '../types';
 import { uiTranslations } from '../data/translations';
 import { getTranslatedProductData } from '../data/i18n';
-import { calculatePerformanceSpecs, getAccuracyFunction } from '../data/productData';
+import { getAccuracyFunction } from '../data/productData';
 import { AccuracyChart } from './AccuracyChart';
 
 interface SummaryProps {
@@ -381,407 +379,361 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
             if (!jsPDF) {
                 throw new Error(t('alert_pdfLibraryNotLoaded'));
             }
-        
             const doc = new jsPDF();
-        
-            // --- English-only setup ---
-            const t_en = (key: keyof typeof uiTranslations.en) => uiTranslations.en[key];
-            const enProductModels = getTranslatedProductData('en');
-            const enModel = enProductModels.find(m => m.id === model.id);
-        
-            if (!enModel) {
-                throw new Error("Could not find English product data for PDF export.");
-            }
-        
-            const enSelectedOptionsList = enModel.configuration
-                .map(category => {
-                    const selectedCode = selections[category.id];
-                    if (!selectedCode) return null;
-                    const option = category.options.find(o => o.code === selectedCode);
-                    return option ? { category: category.title, code: option.code, description: option.description } : null;
-                })
-                .filter((item): item is { category: string; code: string; description: string; } => item !== null);
             
-            const enRangeOption = enModel.configuration.find(c => c.id === 'pressureRange')?.options.find(o => o.code === selections.pressureRange);
-            
-            const [enLine1, enLine2, enLine3, enLine4] = generateTransmitterModelNumber(enModel, selections, customRange, enRangeOption, isCustomRangeValidAndSet, specialRequest, t_en);
-            const enManifoldNumber = generateManifoldModelNumber(enModel, selections);
-        
-            // --- PDF Generation Logic ---
-            const logoUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAmAHMDASIAAhEBAxEB/8QAGwAAAgMBAQEAAAAAAAAAAAAAAAYDBAUCAQf/xAAwEAACAQMDAwMDAwQCAwAAAAABAgMABBEFEiETMQZBURQiYXEHMhUjUpGhscFSYtH/xAAZAQEAAwEBAAAAAAAAAAAAAAAAAQIDBAX/xAAnEQACAgIBAwQCAwEAAAAAAAAAAQIRAxIhBBMxQVEiBWFxkUKBof/aAAwDAQACEQMRAD8A9UooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAChJIUEsQABkk9hRRQAt3XV447e4GnS5nkiI325BwM+dSO/tzg5qS/WdWsZDbz6f5MowGRsgg/IINdCii9zQ1J8U998g/wDqN+lX2UuqXM1jPPaWskscduzh0UnDBSR09+OKy+k6hcarE09xbywhQhUSKQcsoJHPsSRXQ6xbfedMvLUcebC6fBBB/eq20u3+zafbW/wD3YlT+QBVXG00XJ2rT0VKKKKcgKKKKACiiigAooooADXlPqt4h1f6g1iWUkxWyGKMegUZP5JNeonpXgP1UoP/AOwv2J63Ev+41fH5N8ftZ6f4cn/yI2GjzG+1fTrAAm6u44sHoScn8CteO/tT16bYadYRFvPkM0gHoowo/Mk/lXQ23iG0h/ZH93yB501k1qFz1Lkgn8gT+Veb6BfC+/bBYsxyI7l7f8A4xsP/NacY3bXhGjK0lLuR9LooorIahRRRQAUUUUAFY37TNSbS/CmoTRNsllAijIOCdxwf0zWzrzf8Aas+y1jQh/vJ1P8AVx/oaeG7RXkXuZ5ToOgS+Jtbs9ItiFkuX27iMhV6kn5ABNd1dfsh1+O3Z7e8sppAPuKzISfkQMVX/sjsvP8AEF9eEZFtapg+zMR/pU17bRRUcnSKZaStnmep6TeaNfTaffwmG6gbbJGSDg/I4P51X13X7RLE3nhTT5MZaS7mY/O5v/ABXM1DVaRpN2woooqRhRRRQAUUUUAFeL/ALWpDda5o1kvUXEqKB7lwo/3V7RXh/1kUaj9WPDumLyI5bYbf8AiYk/7VPH6l8Ecr0o+T0P6fsIdDsbJf8A9q3SIf4RiuhrJ+n5PM8LaW2c/wB0q/pxWxqqk43bYk7VBRRRQkFFFFAAa8w/a4wGnaIg+9JcOw+gQD/U16fXmP7Wl3TaXo4H3ZLl2P0Cgf6mqcNTRXkXsz/2Q==';
-            doc.addImage(logoUrl, 'JPEG', 15, 10, 50, 10);
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = { top: 20, right: 20, bottom: 20, left: 20 };
+            const innerWidth = pageWidth - margin.left - margin.right;
+            let currentY = margin.top;
+
+            // --- PDF Content ---
+
+            // Header
             doc.setFontSize(18);
-            doc.setFont(undefined, 'bold');
-            doc.text(t_en('pdf_reportTitle'), 105, 20, { align: 'center' });
+            doc.setFont('helvetica', 'bold');
+            doc.text(t('pdf_reportTitle'), pageWidth / 2, currentY, { align: 'center' });
+            currentY += 10;
             doc.setFontSize(10);
-            doc.setFont(undefined, 'normal');
-            doc.text(`${t_en('pdf_date')}: ${new Date().toLocaleDateString()}`, 195, 28, { align: 'right' });
+            doc.setFont('helvetica', 'normal');
+            doc.text(`${t('pdf_date')}: ${new Date().toLocaleDateString()}`, pageWidth / 2, currentY, { align: 'center' });
+            currentY += 15;
 
-            let y = 40;
-            const lineSpacing = 6;
-            const sectionSpacing = 10;
-            const pageMargin = 15;
-            const contentWidth = doc.internal.pageSize.getWidth() - (pageMargin * 2);
-            const keyX = pageMargin;
-            const valueX = 75;
+            // General Info
+            const addInfoLine = (label: string, value: string) => {
+                doc.setFont('helvetica', 'bold');
+                doc.text(label, margin.left, currentY);
+                doc.setFont('helvetica', 'normal');
+                doc.text(value, margin.left + 40, currentY);
+                currentY += 7;
+            };
 
-            const checkPageBreak = () => {
-                if (y > 280) {
-                    doc.addPage();
-                    y = 20;
-                }
+            addInfoLine(`${t('pdf_model')}:`, model.name);
+            if (tag) addInfoLine(`${t('pdf_tagNumber')}:`, tag);
+            currentY += 5;
+            
+            // Transmitter Details
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text(t('pdf_transmitterTitle'), margin.left, currentY);
+            currentY += 8;
+            doc.setFontSize(10);
+            const addModelLine = (label: string, value: string) => {
+                 if (!value) return;
+                 const fullText = `${label}: ${value}`;
+                 const splitText = doc.splitTextToSize(fullText, innerWidth);
+                 if (currentY + splitText.length * 6 > pageHeight - margin.bottom) {
+                     doc.addPage();
+                     currentY = margin.top;
+                 }
+                 doc.text(splitText, margin.left, currentY);
+                 currentY += splitText.length * 6;
             };
             
-            const addSectionHeader = (text: string) => {
-                checkPageBreak();
+            addModelLine(t('pdf_line1'), transmitterModelLines[0]);
+            addModelLine(t('pdf_line2'), transmitterModelLines[1]);
+            const line3Label = isCustomRangeValidAndSet ? t('calibratedRange') : t('selectedRange');
+            addModelLine(`${t('pdf_line3')} (${line3Label})`, transmitterModelLines[2]);
+            addModelLine(`${t('pdf_line4')} (${t('specialRequestsLabel')})`, transmitterModelLines[3]);
+            currentY += 5;
+
+            // Manifold Details
+            if (manifoldModelNumber) {
                 doc.setFontSize(12);
-                doc.setFont(undefined, 'bold');
-                doc.text(text, keyX, y);
-                y += lineSpacing + 2;
-            };
-
-            const addKeyValue = (key: string, value: string) => {
-                if (!value && value !== "") return;
-                checkPageBreak();
+                doc.setFont('helvetica', 'bold');
+                doc.text(t('pdf_manifoldTitle'), margin.left, currentY);
+                currentY += 8;
                 doc.setFontSize(10);
-                doc.setFont(undefined, 'bold');
-                doc.text(key, keyX, y);
-                doc.setFont(undefined, 'normal');
-                const splitValue = doc.splitTextToSize(value, contentWidth - (valueX - keyX));
-                doc.text(splitValue, valueX, y);
-                y += splitValue.length * 5 + 2;
-            };
-            
-            addSectionHeader(t_en('summaryTitle'));
-            addKeyValue(`${t_en('pdf_tagNumber')}:`, tag);
-            addKeyValue(`${t_en('pdf_model')}:`, enModel.name);
-            y += sectionSpacing / 2;
-            
-            addSectionHeader(t_en('pdf_transmitterTitle'));
-            addKeyValue(`${t_en('pdf_line1')}:`, enLine1);
-            addKeyValue(`${t_en('pdf_line2')}:`, enLine2);
-            addKeyValue(`${t_en('pdf_line3')} (${isCustomRangeValidAndSet ? t_en('calibratedRange') : t_en('selectedRange')}):`, enLine3);
-            if (specialRequest) addKeyValue(`${t_en('pdf_line4')} (${t_en('specialRequestsLabel')}):`, specialRequest);
-            y += sectionSpacing / 2;
-
-            if (enManifoldNumber) {
-                addSectionHeader(t_en('pdf_manifoldTitle'));
-                addKeyValue(t_en('pdf_fullCode'), enManifoldNumber);
-                y += sectionSpacing / 2;
-            }
-            
-            addSectionHeader(t_en('pdf_configDetailsTitle'));
-            enSelectedOptionsList.forEach(item => {
-                addKeyValue(`${item.category}:`, `${item.description} (${item.code})`);
-            });
-
-            if (isCustomRangeValidAndSet) {
-                 addKeyValue(`${t_en('customRangeLabel')}:`, `${customRange.low} to ${customRange.high} ${enRangeOption?.unit}`);
+                doc.setFont('helvetica', 'normal');
+                const splitText = doc.splitTextToSize(manifoldModelNumber, innerWidth);
+                doc.text(splitText, margin.left, currentY);
+                currentY += splitText.length * 6;
+                currentY += 5;
             }
 
-            // --- Add Performance Report Section (always in English) ---
-            if (performanceResult) {
-                doc.addPage();
-                y = 20;
-                addSectionHeader(t_en('performanceReportTitle'));
+            // Configuration Details
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text(t('pdf_configDetailsTitle'), margin.left, currentY);
+            currentY += 8;
+
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            
+            const valueColX = pageWidth - margin.right;
+            const keyColWidth = innerWidth * 0.45; 
+            const valueColWidth = innerWidth * 0.55;
+
+            selectedOptionsList.forEach(item => {
+                const keyText = `${item.category}:`;
+                const valueText = `${item.description} (${item.code})`;
+
+                const splitKey = doc.splitTextToSize(keyText, keyColWidth);
+                const splitValue = doc.splitTextToSize(valueText, valueColWidth);
+
+                const rowLines = Math.max(splitKey.length, splitValue.length);
+                const rowHeight = rowLines * 5; // line height
+
+                if (currentY + rowHeight > pageHeight - margin.bottom) {
+                    doc.addPage();
+                    currentY = margin.top;
+                }
+
+                doc.text(splitKey, margin.left, currentY, { baseline: 'top' });
+                doc.text(splitValue, valueColX, currentY, { align: 'right', baseline: 'top' });
                 
+                currentY += rowHeight + 2; // Move to next line with a small gap
+            });
+            doc.setFontSize(10); // Reset font size
+            
+            // Performance Report
+            if (performanceResult) {
+                if (currentY + 20 > pageHeight - margin.bottom) { // Check if there's enough space for the section header
+                    doc.addPage();
+                    currentY = margin.top;
+                }
+                currentY += 10;
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.text(t('performanceReportTitle'), margin.left, currentY);
+                currentY += 8;
+                doc.setFontSize(10);
+
+                const perfData = [
+                    { label: t('turndownRatio'), value: performanceResult.ratio ? `${performanceResult.ratio.toPrecision(3)}:1` : 'N/A' },
+                    ...(Object.values(performanceResult.specs) as PerformanceSpec[]).map(s => ({ label: s.name, value: s.value })),
+                ];
+
+                perfData.forEach(item => {
+                     const splitText = doc.splitTextToSize(`${item.label}: ${item.value}`, innerWidth);
+                     if (currentY + splitText.length * 6 > pageHeight - margin.bottom) {
+                         doc.addPage();
+                         currentY = margin.top;
+                     }
+                     doc.text(splitText, margin.left, currentY);
+                     currentY += splitText.length * 6;
+                });
+                
+                // Add the chart
                 const chartContainer = document.createElement('div');
                 chartContainer.style.position = 'absolute';
-                chartContainer.style.left = '-9999px';
+                chartContainer.style.left = '-9999px'; // Hide it off-screen
                 document.body.appendChild(chartContainer);
+                const accuracyFunction = getAccuracyFunction(model.id, selections.pressureRange || '');
 
-                let chartImageData: string | null = null;
-                try {
-                     chartImageData = await new Promise((resolve, reject) => {
-                        const accuracyData = getAccuracyFunction(enModel.id, selections.pressureRange || '');
-                        const enRangeOpt = enModel.configuration.find(c => c.id === 'pressureRange')?.options.find(o => o.code === selections.pressureRange);
-                        const maxSpan = (enRangeOpt?.max ?? 0) - (enRangeOpt?.min ?? 0);
-                        const minSpan = enRangeOpt?.minSpan ?? 1;
-                        let maxRatio = minSpan > 0 ? maxSpan / minSpan : 1;
-                        const accuracyDataForMaxRatio = getAccuracyFunction(enModel.id, selections.pressureRange || '');
-                        maxRatio = Math.min(maxRatio, accuracyDataForMaxRatio?.maxRatio ?? Infinity);
-
-                        const chartRoot = ReactDOM.createRoot(chartContainer);
-                        chartRoot.render(
-                            <AccuracyChart
-                                accuracyFunction={accuracyData?.func ?? null}
-                                currentRatio={performanceResult.ratio}
-                                currentAccuracy={performanceResult.specs.accuracy.accuracyValue ?? null}
-                                maxRatio={maxRatio}
-                                t={t_en}
-                            />
-                        );
-
-                        setTimeout(() => {
-                            const svgElement = chartContainer.querySelector('svg');
-                            if (!svgElement) return reject('Could not find SVG element for chart.');
-                            
-                            const svgString = new XMLSerializer().serializeToString(svgElement);
-                            const canvas = document.createElement('canvas');
-                            canvas.width = svgElement.width.baseVal.value * 2;
-                            canvas.height = svgElement.height.baseVal.value * 2;
-                            const ctx = canvas.getContext('2d');
-                            if (!ctx) return reject('Could not get canvas context.');
-                            
-                            ctx.scale(2, 2);
-                            const img = new Image();
-                            img.onload = () => {
-                                ctx.drawImage(img, 0, 0);
-                                resolve(canvas.toDataURL('image/png'));
-                            };
-                            img.onerror = () => reject('Error loading SVG as image for PDF conversion.');
-                            img.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgString)))}`;
-                        }, 200);
-                    });
-                } finally {
-                    document.body.removeChild(chartContainer);
-                }
-                
-                if (chartImageData) {
-                    const imgProps = doc.getImageProperties(chartImageData);
-                    const pdfWidth = doc.internal.pageSize.getWidth();
-                    const imgWidth = pdfWidth - pageMargin * 2 - 40;
-                    const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-                    doc.addImage(chartImageData, 'PNG', pageMargin + 20, y, imgWidth, imgHeight);
-                    y += imgHeight + 8;
-                }
-
-                const { ratio, userRange } = performanceResult;
-                const enPerformanceSpecs = calculatePerformanceSpecs(enModel, selections, ratio, t_en);
-                const enPerfRangeOption = enModel.configuration.find(c => c.id === 'pressureRange')?.options.find(o => o.code === selections.pressureRange);
-
-                addKeyValue(t_en('enterCalibrationRange'), `${userRange.low} to ${userRange.high} ${enPerfRangeOption?.unit || ''}`);
-                if (ratio) addKeyValue(t_en('turndownRatio'), `${ratio.toFixed(2)}:1`);
-                
-                y += sectionSpacing / 2;
-                doc.setFont(undefined, 'bold');
-                doc.text(t_en('parameter'), keyX, y);
-                doc.text(t_en('performance'), valueX, y);
-                y += lineSpacing;
-                doc.line(keyX, y - (lineSpacing / 2), contentWidth + keyX, y - (lineSpacing / 2));
-
-                (Object.values(enPerformanceSpecs) as PerformanceSpec[]).forEach(spec => {
-                    addKeyValue(spec.name, spec.value);
+                const chartElement = React.createElement(AccuracyChart, {
+                    accuracyFunction: accuracyFunction?.func ?? null,
+                    currentRatio: performanceResult.ratio,
+                    currentAccuracy: performanceResult.specs.accuracy.accuracyValue ?? null,
+                    maxRatio: performanceResult.maxRatio,
+                    t: t
                 });
+
+                const root = ReactDOM.createRoot(chartContainer);
+                await new Promise<void>(resolve => {
+                    root.render(chartElement);
+                    // Give it a moment to render the SVG
+                    setTimeout(resolve, 500); 
+                });
+                
+                const svgElement = chartContainer.querySelector('svg');
+                if (svgElement) {
+                    const svgString = new XMLSerializer().serializeToString(svgElement);
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const img = new Image();
+                    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                    const url = URL.createObjectURL(svgBlob);
+                    
+                    await new Promise<void>((resolve, reject) => {
+                        img.onload = () => {
+                            // Ensure crisp rendering for the chart
+                            const scale = 2;
+                            canvas.width = img.width * scale;
+                            canvas.height = img.height * scale;
+                            ctx?.scale(scale, scale);
+                            ctx?.drawImage(img, 0, 0);
+                            URL.revokeObjectURL(url);
+                            const pngUrl = canvas.toDataURL('image/png');
+                            
+                            const chartHeight = innerWidth * (img.height / img.width);
+                            if (currentY + chartHeight > pageHeight - margin.bottom) {
+                                doc.addPage();
+                                currentY = margin.top;
+                            }
+                            currentY += 10;
+                            doc.setFontSize(12);
+                            doc.setFont('helvetica', 'bold');
+                            doc.text(t('accuracyChartTitle'), margin.left, currentY);
+                            currentY += 8;
+
+                            doc.addImage(pngUrl, 'PNG', margin.left, currentY, innerWidth, chartHeight);
+                            currentY += chartHeight + 10;
+                            resolve();
+                        };
+                        img.onerror = (e) => {
+                            URL.revokeObjectURL(url);
+                            console.error("Error loading SVG image for PDF", e);
+                            reject(e);
+                        }
+                        img.src = url;
+                    });
+                }
+
+                // Cleanup
+                root.unmount();
+                document.body.removeChild(chartContainer);
             }
 
-            const date = new Date().toISOString().split('T')[0];
-            doc.save(`${model.name.replace(/\s/g, '_')}_Configuration_${date}.pdf`);
-        
+            doc.save(`${model.name.replace(/\s/g, '_')}_Config.pdf`);
+
         } catch (error) {
-            console.error("PDF Export failed:", error);
+            console.error("PDF generation failed:", error);
             alert(t('alert_pdfGenerationError'));
         } finally {
             setIsGeneratingPdf(false);
         }
     };
-
-    const PdfConfirmModal = ({ onConfirm, onClose, t }: { onConfirm: () => void, onClose: () => void, t: (key: keyof typeof uiTranslations.en) => string }) => {
-        useEffect(() => {
-            const handleKeyDown = (e: KeyboardEvent) => {
-                if (e.key === 'Escape') {
-                    onClose();
-                }
-            };
-            document.body.style.overflow = 'hidden';
-            window.addEventListener('keydown', handleKeyDown);
-            return () => {
-                document.body.style.overflow = '';
-                window.removeEventListener('keydown', handleKeyDown);
-            };
-        }, [onClose]);
-
-        return (
-            <div 
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm transition-opacity animate-fade-in"
-                onClick={onClose}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="pdf-confirm-title"
-            >
-                 <style>{`
-                    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-                    @keyframes zoom-in { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-                    .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
-                    .animate-zoom-in { animation: zoom-in 0.2s ease-out forwards; }
-                `}</style>
-                <div 
-                    className="bg-white rounded-lg shadow-xl p-6 m-4 max-w-md w-full transform transition-transform animate-zoom-in"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <h3 id="pdf-confirm-title" className="text-lg font-bold text-gray-800 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        {t('pdfConfirmTitle')}
-                    </h3>
-                    <p className="mt-3 text-sm text-gray-600">{t('pdfConfirmMessage')}</p>
-                    <div className="mt-6 flex justify-end space-x-3">
-                        <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            {t('pdfConfirmCancel')}
-                        </button>
-                        <button onClick={onConfirm} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            {t('pdfConfirmProceed')}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
+    
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-lg">
             <h2 className="text-lg font-semibold text-gray-800 border-b pb-3 mb-4">{t('summaryTitle')}</h2>
-            
-            <div className="mb-4">
-                <label htmlFor="tag-input" className="block text-sm font-medium text-gray-700 mb-1">{t('tagNumberLabel')}</label>
-                <input
-                    id="tag-input"
-                    type="text"
-                    value={tag}
-                    onChange={(e) => onTagChange(e.target.value)}
-                    placeholder={t('tagNumberPlaceholder')}
-                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-            </div>
 
-            {selectedRangeOption && (
-                <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {t('customRangeLabel')} ({selectedRangeOption.unit})
+            <div className="space-y-4">
+                <div>
+                    <label htmlFor="tag-number" className="block text-sm font-medium text-gray-700">{t('tagNumberLabel')}</label>
+                    <input
+                        type="text"
+                        id="tag-number"
+                        value={tag}
+                        onChange={(e) => onTagChange(e.target.value)}
+                        placeholder={t('tagNumberPlaceholder')}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                </div>
+
+                <div>
+                    <label htmlFor="custom-range-low" className="block text-sm font-medium text-gray-700">
+                        {t('customRangeLabel')} ({selectedRangeOption?.unit || '...'})
                     </label>
-                    <div className="flex items-center space-x-2">
+                    <div className="mt-1 flex items-center space-x-2">
                         <input
                             type="number"
+                            id="custom-range-low"
                             value={customRange.low}
                             onChange={(e) => onCustomRangeChange({ ...customRange, low: e.target.value })}
-                            placeholder={`${t('lowPlaceholder')} (Min: ${selectedRangeOption.min})`}
+                            placeholder={t('lowPlaceholder')}
                             className={`w-full p-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${rangeError ? 'border-red-500' : 'border-gray-300'}`}
-                            aria-invalid={!!rangeError}
-                            aria-describedby="range-error"
+                            disabled={!selections.pressureRange}
                         />
-                        <span className="text-gray-500 font-semibold">{t('to')}</span>
+                        <span className="text-gray-500">{t('to')}</span>
                         <input
                             type="number"
+                            id="custom-range-high"
                             value={customRange.high}
                             onChange={(e) => onCustomRangeChange({ ...customRange, high: e.target.value })}
-                            placeholder={`${t('highPlaceholder')} (Max: ${selectedRangeOption.max})`}
+                            placeholder={t('highPlaceholder')}
                             className={`w-full p-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${rangeError ? 'border-red-500' : 'border-gray-300'}`}
-                            aria-invalid={!!rangeError}
-                            aria-describedby="range-error"
+                            disabled={!selections.pressureRange}
                         />
                     </div>
-                    {rangeError && <p id="range-error" className="text-xs text-red-600 mt-1">{rangeError}</p>}
+                     {rangeError && <p className="text-xs text-red-600 mt-1">{rangeError}</p>}
                 </div>
-            )}
-            
-            <div className="mb-4">
-                <label htmlFor="special-request-input" className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('line4Label')}
-                </label>
-                <textarea
-                    id="special-request-input"
-                    rows={2}
-                    value={specialRequest}
-                    onChange={(e) => onSpecialRequestChange(e.target.value)}
-                    placeholder={t('specialRequestsPlaceholder')}
-                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
+
+                 <div>
+                    <label htmlFor="special-requests" className="block text-sm font-medium text-gray-700">{t('line4Label')}</label>
+                    <textarea
+                        id="special-requests"
+                        rows={3}
+                        value={specialRequest}
+                        onChange={(e) => onSpecialRequestChange(e.target.value)}
+                        placeholder={t('specialRequestsPlaceholder')}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                </div>
             </div>
 
-            <div className="bg-gray-100 p-4 rounded-md mb-4 font-mono text-sm text-gray-800 space-y-1">
-                 <p className="font-semibold text-gray-600">{t('transmitterModelLabel')}:</p>
-                <p><span className="font-semibold text-gray-500">{t('pdf_line1')}:</span> {transmitterModelLines[0]}</p>
-                <p><span className="font-semibold text-gray-500">{t('pdf_line2')}:</span> {transmitterModelLines[1]}</p>
-                <p className="text-xs text-gray-500">
-                    {t('pdf_line3')} ({isCustomRangeValidAndSet ? t('calibratedRange') : t('selectedRange')}): {transmitterModelLines[2]}
-                </p>
-                {transmitterModelLines[3] && <p className="text-xs text-gray-500">{t('pdf_line4')}: {transmitterModelLines[3]}</p>}
-            </div>
-            
-            {manifoldModelNumber && (
-                 <div className="bg-gray-100 p-4 rounded-md mb-4 font-mono text-sm text-gray-800">
-                    <p className="font-semibold text-gray-600">{t('manifoldModelLabel')}:</p>
-                    <p>{manifoldModelNumber}</p>
+            <div className="mt-6 pt-4 border-t">
+                <div>
+                    <h3 className="text-sm font-semibold text-gray-800">{t('transmitterModelLabel')}</h3>
+                    <p className="mt-1 p-2 bg-gray-100 rounded font-mono text-sm text-gray-700 whitespace-pre-wrap">{transmitterModelLines.filter(line => line).join('\n')}</p>
                 </div>
-            )}
+                {manifoldModelNumber && (
+                    <div className="mt-3">
+                        <h3 className="text-sm font-semibold text-gray-800">{t('manifoldModelLabel')}</h3>
+                        <p className="mt-1 p-2 bg-gray-100 rounded font-mono text-sm text-gray-700">{manifoldModelNumber}</p>
+                    </div>
+                )}
+            </div>
 
-            <div className="border-t pt-4">
-                <h3 className="font-semibold text-md text-gray-700 mb-2">{t('selectedOptionsLabel')}:</h3>
-                <ul className="space-y-1 text-sm text-gray-600 max-h-60 overflow-y-auto">
-                     {selectedOptionsList.map(option => (
-                        <li key={option.category} className="flex justify-between">
-                            <span className="font-medium">{option.category}:</span>
-                            <span className="text-right">{option.description}</span>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-            
-            <div className="mt-6 grid grid-cols-2 gap-3">
-                <button
-                    onClick={handleCopyToClipboard}
-                    className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-                    aria-label={t('copyAriaLabel')}
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    {isCopied ? t('copied') : t('copy')}
-                </button>
-                 <button
-                    onClick={handleExportToFile}
-                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                    aria-label={t('exportJsonAriaLabel')}
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    {t('exportJson')}
-                </button>
-                <button
-                    onClick={() => setEmailModalVisible(true)}
-                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                    aria-label={t('emailConfigAriaLabel')}
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    {emailButtonText}
-                </button>
-                <button
-                    onClick={handleExportToPdf}
-                    disabled={isGeneratingPdf}
-                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
-                    aria-label={t('exportPdfAriaLabel')}
-                >
-                     {isGeneratingPdf ? (
-                        <svg className="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    ) : (
-                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    )}
-                    {isGeneratingPdf ? t('exportingPdf') : t('exportPdf')}
-                </button>
-            </div>
-            <div className="mt-3">
-                <button
+             <div className="mt-6">
+                <button 
                     onClick={onCalculatePerformance}
-                    disabled={!selectedRangeOption}
-                    className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
+                    className="w-full flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
                     aria-label={t('calculatePerformanceAriaLabel')}
+                    disabled={!selections.pressureRange || !!rangeError || !(customRange.low && customRange.high)}
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 14.95a1 1 0 101.414 1.414l.707-.707a1 1 0 00-1.414-1.414l-.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1zM1.93 9.07a1 1 0 001.414-1.414l.707.707a1 1 0 00-1.414 1.414l-.707-.707z" />
-                      <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011 1zm5.657 2.757a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0zM10 18a1 1 0 01-1-1v-1a1 1 0 112 0v1a1 1 0 01-1 1z" />
-                    </svg>
                     {t('calculatePerformance')}
                 </button>
             </div>
             
-            {isEmailModalVisible && <EmailModal onClose={() => setEmailModalVisible(false)} onSend={handleSendEmail} t={t} />}
-            {showPdfConfirm && <PdfConfirmModal onConfirm={proceedWithPdfExport} onClose={() => setShowPdfConfirm(false)} t={t} />}
+            <div className="mt-6 grid grid-cols-2 sm:grid-cols-2 gap-3">
+                <button
+                    onClick={handleCopyToClipboard}
+                    className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    aria-label={t('copyAriaLabel')}
+                >
+                    {isCopied ? t('copied') : t('copy')}
+                </button>
+                <button
+                    onClick={() => setEmailModalVisible(true)}
+                    className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    aria-label={t('emailConfigAriaLabel')}
+                >
+                    {emailButtonText}
+                </button>
+                <button
+                    onClick={handleExportToFile}
+                    className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    aria-label={t('exportJsonAriaLabel')}
+                >
+                    {t('exportJson')}
+                </button>
+                <button
+                    onClick={handleExportToPdf}
+                    className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    aria-label={t('exportPdfAriaLabel')}
+                    disabled={isGeneratingPdf}
+                >
+                    {isGeneratingPdf ? t('exportingPdf') : t('exportPdf')}
+                </button>
+            </div>
+
+            {isEmailModalVisible && (
+                <EmailModal
+                    onClose={() => setEmailModalVisible(false)}
+                    onSend={handleSendEmail}
+                    t={t}
+                />
+            )}
+            
+            {showPdfConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm" onClick={() => setShowPdfConfirm(false)}>
+                    <div className="bg-white rounded-lg shadow-xl p-6 m-4 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold text-gray-800">{t('pdfConfirmTitle')}</h3>
+                        <p className="mt-2 text-sm text-gray-600">{t('pdfConfirmMessage')}</p>
+                        <div className="mt-6 flex justify-end space-x-3">
+                            <button onClick={() => setShowPdfConfirm(false)} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                {t('pdfConfirmCancel')}
+                            </button>
+                            <button onClick={proceedWithPdfExport} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                {t('pdfConfirmProceed')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
