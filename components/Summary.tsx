@@ -484,41 +484,25 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
                 
                 currentY += rowHeight + 2; // Move to next line with a small gap
             });
-            doc.setFontSize(10); // Reset font size
             
             // Performance Report
             if (performanceResult) {
-                if (currentY + 20 > pageHeight - margin.bottom) { // Check if there's enough space for the section header
-                    doc.addPage();
-                    currentY = margin.top;
-                }
-                currentY += 10;
-                doc.setFontSize(12);
+                doc.addPage();
+                currentY = margin.top;
+
+                doc.setFontSize(14);
                 doc.setFont('helvetica', 'bold');
-                doc.text(t('performanceReportTitle'), margin.left, currentY);
-                currentY += 8;
-                doc.setFontSize(10);
-
-                const perfData = [
-                    { label: t('turndownRatio'), value: performanceResult.ratio ? `${performanceResult.ratio.toPrecision(3)}:1` : 'N/A' },
-                    ...(Object.values(performanceResult.specs) as PerformanceSpec[]).map(s => ({ label: s.name, value: s.value })),
-                ];
-
-                perfData.forEach(item => {
-                     const splitText = doc.splitTextToSize(`${item.label}: ${item.value}`, innerWidth);
-                     if (currentY + splitText.length * 6 > pageHeight - margin.bottom) {
-                         doc.addPage();
-                         currentY = margin.top;
-                     }
-                     doc.text(splitText, margin.left, currentY);
-                     currentY += splitText.length * 6;
-                });
+                doc.text(t('performanceReportTitle'), pageWidth / 2, currentY, { align: 'center' });
+                currentY += 15;
                 
                 // Add the chart
                 const chartContainer = document.createElement('div');
                 chartContainer.style.position = 'absolute';
-                chartContainer.style.left = '-9999px'; // Hide it off-screen
+                chartContainer.style.left = '-9999px';
+                chartContainer.style.width = '500px';
+                chartContainer.style.height = '300px';
                 document.body.appendChild(chartContainer);
+                
                 const accuracyFunction = getAccuracyFunction(model.id, selections.pressureRange || '');
 
                 const chartElement = React.createElement(AccuracyChart, {
@@ -532,7 +516,6 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
                 const root = ReactDOM.createRoot(chartContainer);
                 await new Promise<void>(resolve => {
                     root.render(chartElement);
-                    // Give it a moment to render the SVG
                     setTimeout(resolve, 500); 
                 });
                 
@@ -547,27 +530,23 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
                     
                     await new Promise<void>((resolve, reject) => {
                         img.onload = () => {
-                            // Ensure crisp rendering for the chart
                             const scale = 2;
-                            canvas.width = img.width * scale;
-                            canvas.height = img.height * scale;
+                            canvas.width = svgElement.width.baseVal.value * scale;
+                            canvas.height = svgElement.height.baseVal.value * scale;
                             ctx?.scale(scale, scale);
                             ctx?.drawImage(img, 0, 0);
                             URL.revokeObjectURL(url);
                             const pngUrl = canvas.toDataURL('image/png');
                             
-                            const chartHeight = innerWidth * (img.height / img.width);
-                            if (currentY + chartHeight > pageHeight - margin.bottom) {
-                                doc.addPage();
-                                currentY = margin.top;
-                            }
-                            currentY += 10;
+                            const chartWidth = innerWidth;
+                            const chartHeight = chartWidth * (canvas.height / canvas.width);
+
                             doc.setFontSize(12);
                             doc.setFont('helvetica', 'bold');
                             doc.text(t('accuracyChartTitle'), margin.left, currentY);
                             currentY += 8;
 
-                            doc.addImage(pngUrl, 'PNG', margin.left, currentY, innerWidth, chartHeight);
+                            doc.addImage(pngUrl, 'PNG', margin.left, currentY, chartWidth, chartHeight);
                             currentY += chartHeight + 10;
                             resolve();
                         };
@@ -580,9 +559,38 @@ export const Summary: React.FC<SummaryProps> = ({ model, selections, tag, onTagC
                     });
                 }
 
-                // Cleanup
                 root.unmount();
                 document.body.removeChild(chartContainer);
+                
+                 // Performance Specifications Table
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.text(t('specificationsTitle'), margin.left, currentY);
+                currentY += 8;
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'normal');
+
+                const perfData = [
+                    { label: t('turndownRatio'), value: performanceResult.ratio ? `${performanceResult.ratio.toPrecision(3)}:1` : 'N/A' },
+                    ...(Object.values(performanceResult.specs) as PerformanceSpec[]).map(s => ({ label: s.name, value: s.value })),
+                ];
+
+                perfData.forEach(item => {
+                    const keyText = `${item.label}:`;
+                    const valueText = item.value;
+                    const splitKey = doc.splitTextToSize(keyText, keyColWidth);
+                    const splitValue = doc.splitTextToSize(valueText, valueColWidth);
+                    const rowLines = Math.max(splitKey.length, splitValue.length);
+                    const rowHeight = rowLines * 5;
+
+                     if (currentY + rowHeight > pageHeight - margin.bottom) {
+                         doc.addPage();
+                         currentY = margin.top;
+                     }
+                    doc.text(splitKey, margin.left, currentY, { baseline: 'top' });
+                    doc.text(splitValue, valueColX, currentY, { align: 'right', baseline: 'top' });
+                    currentY += rowHeight + 2;
+                });
             }
 
             doc.save(`${model.name.replace(/\s/g, '_')}_Config.pdf`);
